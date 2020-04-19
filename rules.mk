@@ -45,6 +45,7 @@ endif
 # Tool paths.
 PREFIX	?= arm-none-eabi-
 CC	= $(PREFIX)gcc
+CPPC	= $(PREFIX)g++
 LD	= $(PREFIX)gcc
 OBJCOPY	= $(PREFIX)objcopy
 OBJDUMP	= $(PREFIX)objdump
@@ -55,7 +56,8 @@ OPENCM3_INC = $(OPENCM3_DIR)/include
 # Inclusion of library header files
 INCLUDES += $(patsubst %,-I%, . $(OPENCM3_INC) )
 
-OBJS = $(CFILES:%.c=$(BUILD_DIR)/%.o)
+OBJS = $(CPPFILES:%.cxx=$(BUILD_DIR)/%.o)
+OBJS += $(CFILES:%.c=$(BUILD_DIR)/%.o)
 OBJS += $(AFILES:%.S=$(BUILD_DIR)/%.o)
 GENERATED_BINS = $(PROJECT).elf $(PROJECT).bin $(PROJECT).map $(PROJECT).list $(PROJECT).lss
 
@@ -130,7 +132,7 @@ $(BUILD_DIR)/%.o: %.c
 $(BUILD_DIR)/%.o: %.cxx
 	@printf "  CXX\t$<\n"
 	@mkdir -p $(dir $@)
-	$(Q)$(CC) $(TGT_CXXFLAGS) $(CXXFLAGS) $(TGT_CPPFLAGS) $(CPPFLAGS) -o $@ -c $<
+	$(Q)$(CPPC) $(TGT_CXXFLAGS) $(CXXFLAGS) $(TGT_CPPFLAGS) $(CPPFLAGS) -o $@ -c $<
 
 $(BUILD_DIR)/%.o: %.S
 	@printf "  AS\t$<\n"

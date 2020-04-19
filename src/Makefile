@@ -1,14 +1,12 @@
-PROJECT = awesomesauce
+PROJECT = programmable-remote
 BUILD_DIR = bin
 
-SHARED_DIR = ../my-common-code
-CFILES = my-project.c
-CFILES += api.c
-AFILES += api-asm.S
+CPPFILES = remote.cxx
 
-# TODO - you will need to edit these two lines!
-DEVICE=stm32f407vgt6
-OOCD_FILE = board/stm32f4discovery.cfg
+DEVICE = stm32f103C8T6
+OOCD_FILE = ./bluepill.cfg
+
+CXXFLAGS = -fno-exceptions -fno-rtti
 
 # You shouldn't have to edit anything below here.
 VPATH += $(SHARED_DIR)
