@@ -8,11 +8,23 @@
 #define ARRAY_LEN(array) (sizeof((array))/sizeof((array)[0]))
 #endif
 
+namespace util {
+struct timer_t {
+  uint32_t timer;
+  tim_oc_id channel;
+};
+struct io_t{
+  uint32_t port;
+  uint32_t pin;
+};
+}
+
 #define LED1_PORT GPIOC
 #define LED1_PIN GPIO13
 #define IR_SENSOR_PORT GPIOA
-#define IR_SENSOR_PIN GPIO0
-
+#define IR_SENSOR_PIN GPIO1
+constexpr const util::timer_t output_ir_timer{TIM2, TIM_OC1};
+constexpr const util::io_t output_ir{GPIOA,GPIO0};
 /* Morse standard timings */
 #define ELEMENT_TIME 500
 #define DIT (1*ELEMENT_TIME)
@@ -59,22 +71,24 @@ static void gpio_setup(void)
             GPIO_CNF_OUTPUT_PUSHPULL, LED1_PIN);
   gpio_set(LED1_PORT, LED1_PIN);
 
-  // Enable EXTI0 interrupt.
+  // Enable EXTI1 interrupt.
   rcc_periph_clock_enable(RCC_GPIOA);
   // Enable AFIO clock.
   rcc_periph_clock_enable(RCC_AFIO);
   gpio_set_mode(IR_SENSOR_PORT, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, IR_SENSOR_PIN);
-  nvic_enable_irq(NVIC_EXTI0_IRQ);
+  nvic_enable_irq(NVIC_EXTI1_IRQ);
   // Configure the EXTI subsystem.
-  exti_select_source(EXTI0, IR_SENSOR_PORT);
-  exti_set_trigger(EXTI0, EXTI_TRIGGER_FALLING);
-  exti_enable_request(EXTI0);
+  exti_select_source(EXTI1, IR_SENSOR_PORT);
+  exti_set_trigger(EXTI1, EXTI_TRIGGER_FALLING);
+  exti_enable_request(EXTI1);
 }
 
 static void tim_setup(void)
 {
-	// Enable TIM2 clock.
+	// Enable output_ir_timer clock.
 	rcc_periph_clock_enable(RCC_TIM2);
+        // Output timer compare value on pin
+        gpio_set_mode(output_ir.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, output_ir.pin);
 
 	// Enable TIM2 interrupt.
 	nvic_enable_irq(NVIC_TIM2_IRQ);
@@ -89,7 +103,7 @@ static void tim_setup(void)
 	 * (These are actually default values after reset above, so this call
 	 * is strictly unnecessary, but demos the api for alternative settings)
 	 */
-	timer_set_mode(TIM2, TIM_CR1_CKD_CK_INT,
+	timer_set_mode(output_ir_timer.timer, TIM_CR1_CKD_CK_INT,
 		TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 
 	/*
@@ -99,43 +113,45 @@ static void tim_setup(void)
 	 * In our case, TIM2 on APB1 is running at double frequency, so this
 	 * sets the prescaler to have the timer run at 5kHz
 	 */
-	timer_set_prescaler(TIM2, ((rcc_apb1_frequency * 2) / 5000));
+	timer_set_prescaler(output_ir_timer.timer, ((rcc_apb1_frequency * 2) / 5000));
 
 	// Disable preload.
-	timer_disable_preload(TIM2);
-	timer_continuous_mode(TIM2);
+	timer_disable_preload(output_ir_timer.timer);
+	timer_continuous_mode(output_ir_timer.timer);
 
 	// count full range, as we'll update compare value continuously.
-	timer_set_period(TIM2, 65535);
+	timer_set_period(output_ir_timer.timer, 65535);
 
 	// Set the initual output compare value for OC1.
-	timer_set_oc_value(TIM2, TIM_OC1, frequency_sequence[frequency_sel++]);
+	timer_set_oc_value(output_ir_timer.timer, output_ir_timer.channel, frequency_sequence[frequency_sel++]);
+        timer_set_oc_mode(output_ir_timer.timer, output_ir_timer.channel, TIM_OCM_TOGGLE);
+        timer_enable_oc_output(output_ir_timer.timer, output_ir_timer.channel);
 
 	// Counter enable.
-	timer_enable_counter(TIM2);
+	timer_enable_counter(output_ir_timer.timer);
 
 	// Enable Channel 1 compare interrupt to recalculate compare values.
-	timer_enable_irq(TIM2, TIM_DIER_CC1IE);
+	timer_enable_irq(output_ir_timer.timer, TIM_DIER_CC1IE);
 }
 
 void tim2_isr(void)
 {
-	if (timer_get_flag(TIM2, TIM_SR_CC1IF)) {
+	if (timer_get_flag(output_ir_timer.timer, TIM_SR_CC1IF)) {
 
 		// Clear compare interrupt flag.
-		timer_clear_flag(TIM2, TIM_SR_CC1IF);
+		timer_clear_flag(output_ir_timer.timer, TIM_SR_CC1IF);
 
 		/*
 		 * Get current timer value to calculate next
 		 * compare register value.
 		 */
-		uint16_t compare_time = timer_get_counter(TIM2);
+		uint16_t compare_time = timer_get_counter(output_ir_timer.timer);
 
 		// Calculate and set the next compare value.
 		uint16_t frequency = frequency_sequence[frequency_sel++];
 		uint16_t new_time = compare_time + frequency;
 
-		timer_set_oc_value(TIM2, TIM_OC1, new_time);
+		timer_set_oc_value(output_ir_timer.timer, output_ir_timer.channel, new_time);
 		if (frequency_sel == ARRAY_LEN(frequency_sequence)) {
 			frequency_sel = 0;
 		}
@@ -149,7 +165,7 @@ void tim2_isr(void)
 extern "C" {//void exti0_isr(void);
 void exti0_isr(void)
 {
-  exti_reset_request(EXTI0);
+  exti_reset_request(EXTI1);
 }
 }
 
