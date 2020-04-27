@@ -25,6 +25,7 @@ struct io_t{
 #define IR_SENSOR_PIN GPIO1
 constexpr const util::timer_t output_ir_timer{TIM2, TIM_OC1};
 constexpr const util::io_t output_ir{GPIOA,GPIO0};
+constexpr const util::io_t input_ir{GPIOA,GPIO1};
 /* Morse standard timings */
 #define ELEMENT_TIME 500
 #define DIT (1*ELEMENT_TIME)
@@ -75,12 +76,14 @@ static void gpio_setup(void)
   rcc_periph_clock_enable(RCC_GPIOA);
   // Enable AFIO clock.
   rcc_periph_clock_enable(RCC_AFIO);
-  gpio_set_mode(IR_SENSOR_PORT, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, IR_SENSOR_PIN);
+  /*
+  gpio_set_mode(input_ir.port, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, input_ir.pin);
   nvic_enable_irq(NVIC_EXTI1_IRQ);
   // Configure the EXTI subsystem.
-  exti_select_source(EXTI1, IR_SENSOR_PORT);
+  exti_select_source(EXTI1, input_ir.port);
   exti_set_trigger(EXTI1, EXTI_TRIGGER_FALLING);
   exti_enable_request(EXTI1);
+  */
 }
 
 static void tim_setup(void)
@@ -163,7 +166,7 @@ void tim2_isr(void)
 
 
 extern "C" {//void exti0_isr(void);
-void exti0_isr(void)
+void exti1_isr(void)
 {
   exti_reset_request(EXTI1);
 }
