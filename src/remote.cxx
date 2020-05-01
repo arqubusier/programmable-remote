@@ -29,14 +29,14 @@ constexpr const util::timer_t output_ir_timer{TIM2, RCC_TIM2, RST_TIM2, TIM_OC1,
 // Do not divide clock for highest possible resolution
 // Frequency is ABP1 clock * 2 = 36 MHz.
 // 1 period = 947 * (1/72MHz) = 13.15277... us
-constexpr const util::timer_t carrier_timer{TIM1, RCC_TIM1, RST_TIM1, TIM_OC1, 474, 1};
+//constexpr const util::timer_t carrier_timer{TIM1, RCC_TIM1, RST_TIM1, TIM_OC1, 474, 1};
 // Frequency is ABP2 clock * 2 = 72 MHz.
 // 1 period = 474 * (1/36MHz) = 13.1666... us
-//constexpr const util::timer_t carrier_timer{TIM2, RCC_TIM2, RST_TIM2, TIM_OC1, 474, 1};
+constexpr const util::timer_t carrier_timer{TIM2, RCC_TIM2, RST_TIM2, TIM_OC1, 474, 1};
 //constexpr const util::timer_t carrier_timer{TIM3, RCC_TIM3, RST_TIM3, TIM_OC1, 474, 1};
 
-constexpr const util::io_t output_ir{GPIOA,GPIO8}; // TIM1 CH1 output
-//constexpr const util::io_t output_ir{GPIOA,GPIO0}; // TIM2 CH1 output
+//constexpr const util::io_t output_ir{GPIOA,GPIO8}; // TIM1 CH1 output
+constexpr const util::io_t output_ir{GPIOA,GPIO0}; // TIM2 CH1 output
 //constexpr const util::io_t output_ir{GPIOA,GPIO6}; // TIM3 CH1 output
 
 constexpr const util::io_t input_ir{GPIOA,GPIO1};
@@ -47,11 +47,10 @@ static void clock_setup(void)
 
   // Enable GPIO clock for leds.
   rcc_periph_clock_enable(RCC_GPIOC);
-  // Timers on port A
   rcc_periph_clock_enable(RCC_GPIOA);
+
   // Enable AFIO clock for timers.
   rcc_periph_clock_enable(RCC_AFIO);
-
   // Enable carrier_timer clock.
   rcc_periph_clock_enable(carrier_timer.rcc_tim);
   rcc_periph_reset_pulse(carrier_timer.rst_tim);
