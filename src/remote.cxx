@@ -4,28 +4,11 @@
 #include <libopencm3/stm32/exti.h>
 #include <libopencm3/stm32/timer.h>
 
-#ifndef ARRAY_LEN
-#define ARRAY_LEN(array) (sizeof((array))/sizeof((array)[0]))
-#endif
+#include "nec.hpp"
 
-namespace util {
-struct timer_t {
-  uint32_t tim;
-  rcc_periph_clken rcc_tim;
-  rcc_periph_rst rst_tim;
-  tim_oc_id channel;
-  uint32_t auto_reload_period;
-  uint32_t prescaler;
-};
+#include "util.hpp"
 
-struct io_t{
-  uint32_t port;
-  uint32_t pin;
-};
-}
-
-
-constexpr const util::timer_t command_timer{TIM3, RCC_TIM3, RST_TIM3, TIM_OC1, 65535, 360};
+constexpr const util::timer_t command_timer{TIM3, RCC_TIM3, RST_TIM3, TIM_OC1, 65535, 180};
 // Do not divide clock for highest possible resolution
 // Frequency is ABP1 clock * 2 = 36 MHz.
 // 1 period = 947 * (1/72MHz) = 13.15277... us
@@ -41,6 +24,8 @@ constexpr const util::io_t output_ir{GPIOA,GPIO0}; // TIM2 CH1 output
 
 constexpr const util::io_t input_ir{GPIOA,GPIO1};
 constexpr const util::io_t led_ir{GPIOC,GPIO13};
+
+InputHandler input_handler{command_timer};
 
 static void clock_setup(void)
 {
@@ -106,6 +91,24 @@ static void carrier_tim_setup(void)
 
 static void command_tim_setup(void)
 {
+  // Timer global mode:
+  // - No divider
+  // - Up-couning (Alignment edge, Direction up)
+  timer_set_mode(command_timer.tim, TIM_CR1_CKD_CK_INT,
+          TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+  
+  timer_set_prescaler(command_timer.tim, command_timer.prescaler);
+  timer_continuous_mode(command_timer.tim);
+  
+  timer_set_period(command_timer.tim, command_timer.auto_reload_period);
+  
+  //timer_set_oc_value(command_timer.tim, command_timer.channel, command_timer.auto_reload_period);
+  //timer_set_oc_mode(command_timer.tim, command_timer.channel, TIM_OCM_TOGGLE);
+  //timer_enable_oc_output(command_timer.tim, carrier_timer.channel);
+  
+  // Counter enable.
+  //timer_enable_counter(carrier_timer.tim);
+  // interrupts and DMA requests are disabled by default.
 }
 
 extern "C" {
@@ -116,6 +119,7 @@ void tim2_isr(void)
 
 void exti1_isr(void)
 {
+  input_handler.handle(input_handler);
   exti_reset_request(EXTI1);
 }
 }
