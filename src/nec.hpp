@@ -1,9 +1,11 @@
 #ifndef NEC_HPP
 #define NEC_HPP
-#include <stdint.h>
 #include <libopencm3/stm32/timer.h>
+#include <stdint.h>
 
 #include "util.hpp"
+
+const uint32_t tim3_psc = TIM3_PSC;
 
 class NecHandler {
 public:
@@ -12,7 +14,7 @@ public:
   uint32_t state_ = START;
 
   template <typename HandlerImplementationT>
-  void handle(HandlerImplementationT& handler_implementation) {
+  void handle(HandlerImplementationT &handler_implementation) {
     bool success = false;
     if (state_ == START) {
       success = handler_implementation.start();
@@ -58,18 +60,18 @@ private:
 
   bool is_end(uint32_t state) { return state == DATA_OFFSET + 2 * N_DATA_BITS; }
 
-  void fail() {
-
-  }
+  void fail() {}
 };
 
-class InputHandler final: public NecHandler{
-  util::timer_t const& timer_;
+class InputHandler final : public NecHandler {
+  util::timer_t const &timer_;
+
 public:
-  InputHandler(util::timer_t const& timer): timer_{timer} {}
+  InputHandler(util::timer_t const &timer) : timer_{timer} {}
 
   bool start() {
     bool success = false;
+    timer_set_counter(timer_.tim, 0);
     timer_enable_counter(timer_.tim);
     success = true;
     return success;
@@ -80,7 +82,7 @@ public:
     timer_set_counter(timer_.tim, 0);
     return success;
   }
-  bool data(){
+  bool data() {
     bool success = false;
     return success;
   }
@@ -93,10 +95,29 @@ public:
     return success;
   };
   void reset() {
+    // Timer global mode:
+    // - No divider
+    // - Up-couning (Alignment edge, Direction up)
+    timer_set_mode(timer_.tim, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
+                   TIM_CR1_DIR_UP);
+
+    timer_set_prescaler(timer_.tim, timer_.input_clock/timer_.frequency);
+    timer_continuous_mode(timer_.tim);
+
+    timer_set_period(timer_.tim, timer_.auto_reload_period);
+
+    // timer_set_oc_value(command_timer.tim, command_timer.channel,
+    // command_timer.auto_reload_period); timer_set_oc_mode(command_timer.tim,
+    // command_timer.channel, TIM_OCM_TOGGLE);
+    // timer_enable_oc_output(command_timer.tim, carrier_timer.channel);
+
+    // Counter enable.
+    // timer_enable_counter(carrier_timer.tim);
+    // interrupts and DMA requests are disabled by default.
   };
 };
 
-class OutputHandler final: public NecHandler{
+class OutputHandler final : public NecHandler {
 public:
   bool start() {
     bool success = false;
@@ -106,7 +127,7 @@ public:
     bool success = false;
     return success;
   }
-  bool data(){
+  bool data() {
     bool success = false;
     return success;
   }
@@ -118,7 +139,6 @@ public:
     bool success = false;
     return success;
   };
-  void reset() {
-  };
+  void reset(){};
 };
 #endif // NEC_HPP

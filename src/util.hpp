@@ -1,6 +1,8 @@
 #ifndef UTIL_HPP
 #define UTIL_HPP
 
+#include <stdint.h>
+
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/rcc.h>
 
@@ -11,7 +13,8 @@ struct timer_t {
   rcc_periph_rst rst_tim;
   tim_oc_id channel;
   uint32_t auto_reload_period;
-  uint32_t prescaler;
+  uint32_t input_clock;
+  uint32_t frequency;
 };
 
 struct io_t{
