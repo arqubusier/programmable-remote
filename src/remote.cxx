@@ -44,10 +44,10 @@ static void clock_setup(void) {
   rcc_periph_clock_enable(RCC_AFIO);
 
   // Enable timer clocks.
-  rcc_periph_clock_enable(carrier_timer.rcc_tim);
-  rcc_periph_reset_pulse(carrier_timer.rst_tim);
-  rcc_periph_clock_enable(command_timer.rcc_tim);
-  rcc_periph_reset_pulse(command_timer.rst_tim);
+  rcc_periph_clock_enable(carrier_timer.rcc_tim_);
+  rcc_periph_reset_pulse(carrier_timer.rst_tim_);
+  rcc_periph_clock_enable(command_timer.rcc_tim_);
+  rcc_periph_reset_pulse(command_timer.rst_tim_);
 }
 
 static void gpio_setup(void) {
@@ -73,21 +73,21 @@ static void carrier_tim_setup(void) {
   // Timer global mode:
   // - No divider
   // - Up-couning (Alignment edge, Direction up)
-  timer_set_mode(carrier_timer.tim, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
+  timer_set_mode(carrier_timer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                  TIM_CR1_DIR_UP);
 
-  timer_set_prescaler(carrier_timer.tim, carrier_timer.frequency);
-  timer_continuous_mode(carrier_timer.tim);
+  timer_set_prescaler(carrier_timer.tim_, carrier_timer.frequency_);
+  timer_continuous_mode(carrier_timer.tim_);
 
-  timer_set_period(carrier_timer.tim, carrier_timer.auto_reload_period);
+  timer_set_period(carrier_timer.tim_, carrier_timer.auto_reload_period_);
 
-  timer_set_oc_value(carrier_timer.tim, carrier_timer.channel,
-                     carrier_timer.auto_reload_period);
-  timer_set_oc_mode(carrier_timer.tim, carrier_timer.channel, TIM_OCM_TOGGLE);
-  timer_enable_oc_output(carrier_timer.tim, carrier_timer.channel);
+  timer_set_oc_value(carrier_timer.tim_, carrier_timer.channel_,
+                     carrier_timer.auto_reload_period_);
+  timer_set_oc_mode(carrier_timer.tim_, carrier_timer.channel_, TIM_OCM_TOGGLE);
+  timer_enable_oc_output(carrier_timer.tim_, carrier_timer.channel_);
 
   // Counter enable.
-  timer_enable_counter(carrier_timer.tim);
+  timer_enable_counter(carrier_timer.tim_);
 
   // interrupts and DMA requests are disabled by default.
 }
@@ -96,13 +96,13 @@ static void command_tim_setup(void) {
   // Timer global mode:
   // - No divider
   // - Up-couning (Alignment edge, Direction up)
-  timer_set_mode(command_timer.tim, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
+  timer_set_mode(command_timer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                  TIM_CR1_DIR_UP);
 
   // timer_set_prescaler(command_timer.tim, command_timer.prescaler);
-  timer_continuous_mode(command_timer.tim);
+  timer_continuous_mode(command_timer.tim_);
 
-  timer_set_period(command_timer.tim, command_timer.auto_reload_period);
+  timer_set_period(command_timer.tim_, command_timer.auto_reload_period_);
 
   // timer_set_oc_value(command_timer.tim, command_timer.channel,
   // command_timer.auto_reload_period); timer_set_oc_mode(command_timer.tim,

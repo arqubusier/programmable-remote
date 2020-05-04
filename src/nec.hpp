@@ -11,9 +11,9 @@ public:
   constexpr static const uint32_t N_DATA_BITS = 32;
   constexpr static const uint32_t START_NS = 9000000;
   constexpr static const uint32_t START_SPACE_NS = 4500000;
-  constexpr static const uint32_t CARRIER_PULSE = 560000;
-  constexpr static const uint32_t CARRIER_SPACE_1 = 1690000;
-  constexpr static const uint32_t CARRIER_SPACE_0 = 560000;
+  constexpr static const uint32_t CARRIER_PULSE_NS = 560000;
+  constexpr static const uint32_t CARRIER_SPACE_1_NS = 1690000;
+  constexpr static const uint32_t CARRIER_SPACE_0_NS = 560000;
   uint32_t state_ = START;
 
   template <typename HandlerImplementationT>
@@ -35,7 +35,7 @@ public:
     }
     */
 
-    success = handle_sub(state);
+    success = handler_implementation.handle_sub(state_);
 
     if (success) {
       if (is_end(state_)) {
@@ -53,8 +53,6 @@ public:
 
 protected:
   ~NecHandler() = default;
-
-private:
   bool is_data(uint32_t state) {
     return state >= DATA_OFFSET && state < DATA_OFFSET + 2 * N_DATA_BITS &&
            ((state % 2) == 0);
@@ -67,96 +65,63 @@ private:
 
   bool is_end(uint32_t state) { return state == DATA_OFFSET + 2 * N_DATA_BITS; }
 
+private:
   void fail() {}
 };
 
 class InputHandler final : public NecHandler {
   util::timer_t const &timer_;
-  bool
 
-      public : InputHandler(util::timer_t const &timer)
-      : timer_{timer} {}
+public:
+  InputHandler(util::timer_t const &timer) : timer_{timer} {}
 
   bool handle_sub(uint32_t state) {
-    uint32_t delta = timer_get_counter(timer_.tim);
-    uint32_t threshold = util::ns2count(timer_, 2000000);
+    bool success = false;
+    uint32_t delta = timer_get_counter(timer_.tim_);
 
     if (state_ == START) {
-      timer_enable_counter(timer_.tim);
+      timer_enable_counter(timer_.tim_);
     } else if (state_ == START_SPACE) {
-      uint32_t delta = timer_get_counter(timer_.tim);
       uint32_t threshold = util::ns2count(timer_, 1800000);
       success =
           util::valid_delta(delta, util::ns2count(timer_, START_NS), threshold);
     } else if (state == START_SPACE + 1) {
-      uint32_t delta = timer_get_counter(timer_.tim);
       uint32_t threshold = util::ns2count(timer_, 1000000);
       success = util::valid_delta(delta, util::ns2count(timer_, START_SPACE_NS),
                                   threshold);
     } else if (is_data(state_)) {
-      uint32_t delta = timer_get_counter(timer_.tim);
+      uint32_t threshold0 = util::ns2count(timer_, 100000);
+      uint32_t threshold1 = util::ns2count(timer_, 300000);
+      if ((success = util::valid_delta(
+               delta, util::ns2count(timer_, CARRIER_SPACE_0_NS),
+               threshold0))) {
+      } else if ((success = util::valid_delta(
+                      delta, util::ns2count(timer_, CARRIER_SPACE_1_NS),
+                      threshold1))) {
+      } else {
+        // should never happen
+      }
+    } else if (is_data_space(state_)) {
       uint32_t threshold = util::ns2count(timer_, 950000);
       success = util::valid_delta(delta, util::ns2count(timer_, START_SPACE_NS),
                                   threshold);
-    } else if (is_data_space(state_)) {
-      uint32_t delta = timer_get_counter(timer_.tim);
-      uint32_t threshold0 = util::ns2count(timer_, 100000);
-      uint32_t threshold1 = util::ns2count(timer_, 300000);
-      if (success = util::valid_delta(
-              delta, util::ns2count(timer_, CARRIER_SPACE_0_NS), threshold0)) {
-      } else if (success = util::valid_delta(
-                     delta,
-                     util::ns2count(timer_, CARRIER_SPACE_1_NS, threshold1))) {
-      }
     } else if (is_end(state_)) {
     } else {
       // should never happend
     }
 
-    timer_set_counter(timer_.tim, 0);
-  }
-
-  bool start() {
-    timer_set_counter(timer_.tim, 0);
-    timer_enable_counter(timer_.tim);
-    return true;
-  }
-  bool start_space() {
-    uint32_t delta = timer_get_counter(timer_.tim);
-    uint32_t threshold = util::ns2count(timer_, 2000000);
-
-    timer_set_counter(timer_.tim, 0);
-    return util::valid_delta(delta, util::ns2count(timer_, START_NS),
-                             threshold);
-  }
-  bool data() {
-    uint32_t delta = timer_get_counter(timer_.tim);
-    uint32_t threshold = util::ns2count(timer_, 1000000);
-
-    timer_set_counter(timer_.tim, 0);
-    return util::valid_delta(delta, util::ns2count(timer_, START_SPACE_NS),
-                             threshold);
-  }
-  bool data_space() {
-    uint32_t delta = timer_get_counter(timer_.tim);
-    uint32_t threshold = util::ns2count(timer_, 1000000);
-
-    timer_set_counter(timer_.tim, 0);
-    return util::valid_delta(delta, util::ns2count(timer_, START_SPACE_NS),
-                             threshold);
-  };
-  bool end() {
-    bool success = false;
+    timer_set_counter(timer_.tim_, 0);
     return success;
-  };
+  }
+
   void reset() {
-    timer_set_mode(timer_.tim, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
+    timer_set_mode(timer_.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                    TIM_CR1_DIR_UP);
 
-    timer_set_prescaler(timer_.tim, timer_.input_clock / timer_.frequency);
-    timer_continuous_mode(timer_.tim);
+    timer_set_prescaler(timer_.tim_, timer_.input_clock_ / timer_.frequency_);
+    timer_continuous_mode(timer_.tim_);
 
-    timer_set_period(timer_.tim, timer_.auto_reload_period);
+    timer_set_period(timer_.tim_, timer_.auto_reload_period_);
   };
 };
 
