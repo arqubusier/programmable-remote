@@ -76,22 +76,27 @@ public:
   InputHandler(util::timer_t const &timer) : timer_{timer} {}
 
   bool handle_sub(uint32_t state) {
+    constexpr float threshold_factor = .2;
     bool success = false;
     uint32_t delta = timer_get_counter(timer_.tim_);
 
     if (state_ == START) {
       timer_enable_counter(timer_.tim_);
+      success = true;
     } else if (state_ == START_SPACE) {
-      uint32_t threshold = util::ns2count(timer_, 1800000);
+      uint32_t threshold = util::ns2count(timer_, START_NS * threshold_factor);
       success =
           util::valid_delta(delta, util::ns2count(timer_, START_NS), threshold);
     } else if (state == START_SPACE + 1) {
-      uint32_t threshold = util::ns2count(timer_, 1000000);
+      uint32_t threshold =
+          util::ns2count(timer_, START_SPACE_NS * threshold_factor);
       success = util::valid_delta(delta, util::ns2count(timer_, START_SPACE_NS),
                                   threshold);
     } else if (is_data(state_)) {
-      uint32_t threshold0 = util::ns2count(timer_, 100000);
-      uint32_t threshold1 = util::ns2count(timer_, 300000);
+      uint32_t threshold0 =
+          util::ns2count(timer_, CARRIER_SPACE_0_NS * threshold_factor);
+      uint32_t threshold1 =
+          util::ns2count(timer_, CARRIER_SPACE_1_NS * threshold_factor);
       if ((success = util::valid_delta(
                delta, util::ns2count(timer_, CARRIER_SPACE_0_NS),
                threshold0))) {
@@ -102,9 +107,10 @@ public:
         // should never happen
       }
     } else if (is_data_space(state_)) {
-      uint32_t threshold = util::ns2count(timer_, 950000);
-      success = util::valid_delta(delta, util::ns2count(timer_, START_SPACE_NS),
-                                  threshold);
+      uint32_t threshold =
+          util::ns2count(timer_, CARRIER_PULSE_NS * threshold_factor);
+      success = util::valid_delta(
+          delta, util::ns2count(timer_, CARRIER_PULSE_NS), threshold);
     } else if (is_end(state_)) {
     } else {
       // should never happend
