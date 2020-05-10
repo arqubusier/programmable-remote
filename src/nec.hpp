@@ -5,150 +5,104 @@
 
 #include "util.hpp"
 
-union NecCommand {
-  uint16_t array[2];
-  uint32_t word;
-};
-
-class NecHandler {
+class PulseHandler {
 public:
-  enum : uint32_t { START = 0, START_SPACE, DATA_OFFSET };
-  constexpr static const uint32_t N_DATA_BITS = 32;
-  constexpr static const uint32_t START_NS = 9000000;
-  constexpr static const uint32_t START_SPACE_NS = 4500000;
-  constexpr static const uint32_t CARRIER_PULSE_NS = 560000;
-  constexpr static const uint32_t CARRIER_SPACE_1_NS = 1690000;
-  constexpr static const uint32_t CARRIER_SPACE_0_NS = 560000;
-  uint32_t state_ = START;
+  enum Result { CONTINUE, STOP, ERROR };
+  uint32_t state_;
+  util::timer_t const &timer_;
+  static const uint32_t MAX_TIMING_LIMIT = 100;
+  uint16_t timings_[MAX_TIMING_LIMIT];
+
+  PulseHandler(util::timer_t const &timer) : state_{0}, timer_{timer} {}
 
   template <typename HandlerImplementationT>
   void handle(HandlerImplementationT &handler_implementation) {
-    bool success = false;
-
-    success = handler_implementation.handle_sub(state_);
-
-    if (success) {
-      if (is_end(state_)) {
-        handler_implementation.reset();
-        state_ = START;
-      } else {
-        state_++;
-      }
-    } else {
-      fail();
+    if (state_ >= MAX_TIMING_LIMIT) {
+      state_ = 0;
       handler_implementation.reset();
-      state_ = START;
+      fail();
+    }
+
+    switch (handler_implementation.handle_sub(state_)) {
+    case CONTINUE:
+      state_++;
+      break;
+    case STOP:
+      state_ = 0;
+      handler_implementation.reset();
+      break;
+    case ERROR:
+    default:
+      state_ = 0;
+      handler_implementation.reset();
+      fail();
+      break;
     }
   }
 
 protected:
-  ~NecHandler() = default;
-  bool is_data(uint32_t state) {
-    return state >= DATA_OFFSET && state < DATA_OFFSET + 2 * N_DATA_BITS &&
-           ((state % 2) == 0);
-  }
-
-  bool is_data_space(uint32_t state) {
-    return state >= DATA_OFFSET && state < DATA_OFFSET + 2 * N_DATA_BITS &&
-           ((state % 2) == 1);
-  }
-
-  bool is_end(uint32_t state) { return state == DATA_OFFSET + 2 * N_DATA_BITS; }
+  ~PulseHandler() = default;
 
 private:
   void fail() {}
 };
 
-class InputHandler final : public NecHandler {
-  util::timer_t const &timer_;
-  NecCommand command_;
-  uint32_t ones_ = 0;
-  uint32_t zeros_ = 0;
+class InputHandler final : public PulseHandler {
+  bool timeout() { return true; }
 
 public:
-  InputHandler(util::timer_t const &timer) : timer_{timer}, command_{0} {}
+  InputHandler(util::timer_t const &timer) : PulseHandler{timer} {}
 
-  bool handle_sub(uint32_t state) {
-    constexpr float threshold_factor = .2;
-    bool success = false;
+  Result handle_sub(uint32_t state) {
+    Result result = ERROR;
     uint32_t delta = timer_get_counter(timer_.tim_);
 
-    if (state_ == START) {
+    if (state == 0) {
       timer_enable_counter(timer_.tim_);
-      success = true;
-    } else if (state_ == START_SPACE) {
-      uint32_t threshold = util::ns2count(timer_, START_NS * threshold_factor);
-      success =
-          util::valid_delta(delta, util::ns2count(timer_, START_NS), threshold);
-    } else if (state == START_SPACE + 1) {
-      uint32_t threshold =
-          util::ns2count(timer_, START_SPACE_NS * threshold_factor);
-      success = util::valid_delta(delta, util::ns2count(timer_, START_SPACE_NS),
-                                  threshold);
-    } else if (is_data(state_) || is_end(state_)) {
-      uint32_t threshold0 =
-          util::ns2count(timer_, CARRIER_SPACE_0_NS * threshold_factor);
-      uint32_t threshold1 =
-          util::ns2count(timer_, CARRIER_SPACE_1_NS * threshold_factor);
-      command_.word >>= 1;
-      if ((success = util::valid_delta(
-               delta, util::ns2count(timer_, CARRIER_SPACE_0_NS),
-               threshold0))) {
-        command_.word &= 0x7FFFFFFF;
-        zeros_++;
-      } else if ((success = util::valid_delta(
-                      delta, util::ns2count(timer_, CARRIER_SPACE_1_NS),
-                      threshold1))) {
-        command_.word |= 0x80000000;
-        ones_++;
-      } else {
-      }
-    } else if (is_data_space(state_)) {
-      uint32_t threshold =
-          util::ns2count(timer_, CARRIER_PULSE_NS * threshold_factor);
-      success = util::valid_delta(
-          delta, util::ns2count(timer_, CARRIER_PULSE_NS), threshold);
+      result = CONTINUE;
     } else {
-      // should never happend
+      timings_[state - 1] = delta;
+      result = CONTINUE;
     }
-
     timer_set_counter(timer_.tim_, 0);
-    return success;
+
+    return result;
+  }
+
+  void stop() {
+    bool status = timer_get_flag(timer_.tim_, TIM_SR_UIF);
+    uint32_t delta = timer_get_counter(timer_.tim_);
+    state_ = 0;
+    reset();
   }
 
   void reset() {
+    timer_disable_counter(timer_.tim_);
+    timer_set_counter(timer_.tim_, 0);
+  }
+
+  void setup() {
+    nvic_enable_irq(timer_.irqn_);
+    rcc_periph_reset_pulse(timer_.rst_tim_);
     timer_set_mode(timer_.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                    TIM_CR1_DIR_UP);
 
     timer_set_prescaler(timer_.tim_, timer_.input_clock_ / timer_.frequency_);
+    timer_disable_preload(timer_.tim_);
     timer_continuous_mode(timer_.tim_);
 
-    timer_set_period(timer_.tim_, timer_.auto_reload_period_);
-  };
+    timer_set_period(timer_.tim_, 65535);
+    timer_set_oc_value(timer_.tim_, TIM_OC1,
+                       timer_.auto_reload_period_);
+
+    // update event is enabled default.
+    timer_enable_irq(timer_.tim_, 0);
+    timer_enable_irq(timer_.tim_, TIM_DIER_CC1IE);
+  }
 };
 
-class OutputHandler final : public NecHandler {
+class OutputHandler final : public PulseHandler {
 public:
-  bool start() {
-    bool success = false;
-    return success;
-  }
-  bool start_space() {
-    bool success = false;
-    return success;
-  }
-  bool data() {
-    bool success = false;
-    return success;
-  }
-  bool data_space() {
-    bool success = false;
-    return success;
-  };
-  bool end() {
-    bool success = false;
-    return success;
-  };
   void reset(){};
 };
 #endif // NEC_HPP

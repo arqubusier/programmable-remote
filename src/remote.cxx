@@ -8,8 +8,12 @@
 
 #include "util.hpp"
 
-constexpr const util::timer_t command_timer{TIM3,  RCC_TIM3, RST_TIM3, TIM_OC1,
-                                            65535, 72000000, 200000};
+constexpr uint32_t const command_timer_freq = 200 * KILO;
+constexpr const util::timer_t command_timer{
+    TIM3,      RCC_TIM3,          RST_TIM3,
+    TIM_OC1,   NVIC_TIM3_IRQ,     util::ns2count(command_timer_freq, 15 * MEGA),
+    72 * MEGA, command_timer_freq};
+
 // Do not divide clock for highest possible resolution
 // Frequency is ABP1 clock * 2 = 36 MHz.
 // 1 period = 947 * (1/72MHz) = 13.15277... us
@@ -18,7 +22,7 @@ constexpr const util::timer_t command_timer{TIM3,  RCC_TIM3, RST_TIM3, TIM_OC1,
 // Frequency is ABP2 clock * 2 = 72 MHz.
 // 1 period = 474 * (1/36MHz) = 13.1666... us
 constexpr const util::timer_t carrier_timer{TIM2, RCC_TIM2, RST_TIM2, TIM_OC1,
-                                            474,  1,        1};
+                                            0,    474,      1,        1};
 // constexpr const util::timer_t carrier_timer{TIM3, RCC_TIM3, RST_TIM3,
 // TIM_OC1, 474, 1};
 
@@ -92,43 +96,26 @@ static void carrier_tim_setup(void) {
   // interrupts and DMA requests are disabled by default.
 }
 
-static void command_tim_setup(void) {
-  // Timer global mode:
-  // - No divider
-  // - Up-couning (Alignment edge, Direction up)
-  timer_set_mode(command_timer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
-                 TIM_CR1_DIR_UP);
-
-  // timer_set_prescaler(command_timer.tim, command_timer.prescaler);
-  timer_continuous_mode(command_timer.tim_);
-
-  timer_set_period(command_timer.tim_, command_timer.auto_reload_period_);
-
-  // timer_set_oc_value(command_timer.tim, command_timer.channel,
-  // command_timer.auto_reload_period); timer_set_oc_mode(command_timer.tim,
-  // command_timer.channel, TIM_OCM_TOGGLE);
-  // timer_enable_oc_output(command_timer.tim, carrier_timer.channel);
-
-  // Counter enable.
-  // timer_enable_counter(carrier_timer.tim);
-  // interrupts and DMA requests are disabled by default.
-}
-
 extern "C" {
 void tim2_isr(void) {}
+void tim3_isr(void) {
+  timer_clear_flag(command_timer.tim_, TIM_SR_UIF);
+  input_handler.stop();
+}
 
 void exti1_isr(void) {
-  input_handler.handle(input_handler);
   exti_reset_request(EXTI1);
+  input_handler.handle(input_handler);
 }
 }
 
 // extern "C" void main(void);
 int main(void) {
+  nvic_get_irq_enabled(NVIC_EXTI1_IRQ);
   clock_setup();
-  input_handler.reset();
+  input_handler.setup();
   gpio_setup();
-  carrier_tim_setup();
+  //carrier_tim_setup();
   while (true) {
   }
 }

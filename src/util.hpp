@@ -20,20 +20,29 @@ namespace util {
 class timer_t {
 public:
   constexpr timer_t(uint32_t tim, rcc_periph_clken rcc_tim,
-                    rcc_periph_rst rst_tim, tim_oc_id channel,
+                    rcc_periph_rst rst_tim, tim_oc_id channel, uint8_t irqn,
                     uint32_t auto_reload_period, uint32_t input_clock,
                     uint32_t frequency)
       : tim_(tim), rcc_tim_(rcc_tim), rst_tim_(rst_tim), channel_(channel),
-        auto_reload_period_(auto_reload_period), input_clock_(input_clock),
-        frequency_(frequency) {}
+        irqn_(irqn), auto_reload_period_(auto_reload_period),
+        input_clock_(input_clock), frequency_(frequency) {}
   uint32_t tim_;
   rcc_periph_clken rcc_tim_;
   rcc_periph_rst rst_tim_;
   tim_oc_id channel_;
+  uint8_t irqn_;
   uint32_t auto_reload_period_;
   uint32_t input_clock_;
   uint32_t frequency_;
 };
+
+constexpr uint32_t ns2count(uint32_t frequency, uint32_t val_ns) {
+  uint64_t frequency_ = frequency;
+  uint64_t val = val_ns;
+  uint64_t divisor = GIGA;
+
+  return static_cast<uint32_t>(val * frequency_ / divisor);
+}
 
 constexpr uint32_t ns2count(timer_t timer, uint32_t val_ns) {
   uint64_t frequency = timer.frequency_;
@@ -56,7 +65,7 @@ constexpr uint32_t us_khz2count(timer_t timer, uint32_t val_us) {
 }
 
 constexpr uint32_t ms_khz2count(timer_t timer, uint32_t val_ms) {
-  return static_cast<uint32_t>(val_ms * timer.frequency_ );
+  return static_cast<uint32_t>(val_ms * timer.frequency_);
 }
 
 struct io_t {
