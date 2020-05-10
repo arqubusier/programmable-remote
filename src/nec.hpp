@@ -5,6 +5,11 @@
 
 #include "util.hpp"
 
+union NecCommand {
+  uint16_t array[2];
+  uint32_t word;
+};
+
 class NecHandler {
 public:
   enum : uint32_t { START = 0, START_SPACE, DATA_OFFSET };
@@ -19,21 +24,6 @@ public:
   template <typename HandlerImplementationT>
   void handle(HandlerImplementationT &handler_implementation) {
     bool success = false;
-    /*
-    if (state_ == START) {
-      success = handler_implementation.start();
-    } else if (state_ == START_SPACE) {
-      success = handler_implementation.start_space();
-    } else if (is_data(state_)) {
-      success = handler_implementation.data(state);
-    } else if (is_data_space(state_)) {
-      success = handler_implementation.data_space();
-    } else if (is_end(state_)) {
-      success = handler_implementation.end();
-    } else {
-      // should never happend
-    }
-    */
 
     success = handler_implementation.handle_sub(state_);
 
@@ -71,9 +61,12 @@ private:
 
 class InputHandler final : public NecHandler {
   util::timer_t const &timer_;
+  NecCommand command_;
+  uint32_t ones_ = 0;
+  uint32_t zeros_ = 0;
 
 public:
-  InputHandler(util::timer_t const &timer) : timer_{timer} {}
+  InputHandler(util::timer_t const &timer) : timer_{timer}, command_{0} {}
 
   bool handle_sub(uint32_t state) {
     constexpr float threshold_factor = .2;
@@ -92,26 +85,29 @@ public:
           util::ns2count(timer_, START_SPACE_NS * threshold_factor);
       success = util::valid_delta(delta, util::ns2count(timer_, START_SPACE_NS),
                                   threshold);
-    } else if (is_data(state_)) {
+    } else if (is_data(state_) || is_end(state_)) {
       uint32_t threshold0 =
           util::ns2count(timer_, CARRIER_SPACE_0_NS * threshold_factor);
       uint32_t threshold1 =
           util::ns2count(timer_, CARRIER_SPACE_1_NS * threshold_factor);
+      command_.word >>= 1;
       if ((success = util::valid_delta(
                delta, util::ns2count(timer_, CARRIER_SPACE_0_NS),
                threshold0))) {
+        command_.word &= 0x7FFFFFFF;
+        zeros_++;
       } else if ((success = util::valid_delta(
                       delta, util::ns2count(timer_, CARRIER_SPACE_1_NS),
                       threshold1))) {
+        command_.word |= 0x80000000;
+        ones_++;
       } else {
-        // should never happen
       }
     } else if (is_data_space(state_)) {
       uint32_t threshold =
           util::ns2count(timer_, CARRIER_PULSE_NS * threshold_factor);
       success = util::valid_delta(
           delta, util::ns2count(timer_, CARRIER_PULSE_NS), threshold);
-    } else if (is_end(state_)) {
     } else {
       // should never happend
     }
