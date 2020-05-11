@@ -8,6 +8,7 @@ using rcc_periph_clken = uint32_t;
 using rcc_periph_rst = uint32_t;
 using tim_oc_id = uint32_t;
 #else
+#include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/timer.h>
 #endif
@@ -17,6 +18,52 @@ constexpr const uint32_t MEGA = 1000000;
 constexpr const uint32_t KILO = 1000;
 
 namespace util {
+
+constexpr rcc_periph_clken GetTimerRccPeriphClken(uint32_t tim) {
+  switch (tim) {
+  case TIM1:
+    return RCC_TIM1;
+  case TIM2:
+    return RCC_TIM2;
+  case TIM3:
+    return RCC_TIM3;
+  case TIM4:
+    return RCC_TIM4;
+  }
+}
+
+constexpr rcc_periph_rst GetTimerRccPeriphRst(uint32_t tim) {
+  switch (tim) {
+  case TIM1:
+    return RST_TIM1;
+  case TIM2:
+    return RST_TIM2;
+  case TIM3:
+    return RST_TIM3;
+  case TIM4:
+    return RST_TIM4;
+  }
+}
+
+constexpr uint8_t GetTimerIrqn(uint32_t tim) {
+  switch (tim) {
+  case TIM2:
+    return NVIC_TIM2_IRQ;
+  case TIM3:
+    return NVIC_TIM3_IRQ;
+  case TIM4:
+    return NVIC_TIM4_IRQ;
+  }
+}
+
+struct Timer {
+  uint32_t tim_;
+  tim_oc_id channel_;
+  uint32_t input_clock_;
+  uint32_t frequency_;
+  uint32_t period_;
+};
+
 class timer_t {
 public:
   constexpr timer_t(uint32_t tim, rcc_periph_clken rcc_tim,
