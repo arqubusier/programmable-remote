@@ -33,6 +33,7 @@
 BUILD_DIR ?= bin
 OPT ?= -Os
 CSTD ?= -std=c99
+OOCD_FILE = ../bluepill.cfg
 
 # Be silent per default, but 'make V=1' will show all compiler calls.
 # If you're insane, V=99 will print out all sorts of things.
@@ -162,10 +163,7 @@ ifeq (,$(OOCD_FILE))
 		-c "program $(realpath $(*).elf) verify reset exit" \
 		$(NULL)
 else
-	$(Q)(echo "halt; program $(realpath $(*).elf) verify reset" | nc -4 localhost 4444 2>/dev/null) || \
-		$(OOCD) -f $(OOCD_FILE) \
-		-c "program $(realpath $(*).elf) verify reset exit" \
-		$(NULL)
+	echo "reset halt; stm32f1x mass_erase 0 ;flash write_bank 0 $(realpath $(*).elf) 0; reset halt" | nc -q 1 localhost 4444
 endif
 
 clean:
