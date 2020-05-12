@@ -90,7 +90,7 @@ public:
 
     timer_set_mode(timer_.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                    TIM_CR1_DIR_UP);
-    timer_set_prescaler(timer_.tim_, ((rcc_apb1_frequency * 2) / 5000));
+    timer_set_prescaler(timer_.tim_, timer_.prescaler_);
     timer_continuous_mode(timer_.tim_);
     timer_set_period(timer_.tim_, 1000);
 

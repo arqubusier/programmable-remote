@@ -59,8 +59,7 @@ constexpr uint8_t GetTimerIrqn(uint32_t tim) {
 struct Timer {
   uint32_t tim_;
   tim_oc_id channel_;
-  uint32_t input_clock_;
-  uint32_t frequency_;
+  uint32_t prescaler_;
   uint32_t period_;
 };
 

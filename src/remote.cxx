@@ -8,7 +8,9 @@
 
 #include "util.hpp"
 // constexpr uint32_t const command_timer_freq = 200 * KILO;
-util::Timer cmd_timer{TIM3, TIM_OC1, rcc_apb1_frequency * 2, 5000, 1000};
+
+// (rcc_apb1_frequency * 2)/ 5000 = 14400
+util::Timer cmd_timer{TIM3, TIM_OC1, 14400, 1000};
 
 constexpr uint32_t const command_timer_freq = 200 * KILO;
 constexpr const util::timer_t command_timer{
@@ -37,7 +39,6 @@ constexpr const util::io_t led_ir{GPIOC, GPIO13};
 
 InputHandler input_handler{cmd_timer};
 
-/*
 static void clock_setup(void) {
   rcc_clock_setup_in_hse_8mhz_out_72mhz();
 
@@ -99,78 +100,22 @@ static void carrier_tim_setup(void) {
   // interrupts and DMA requests are disabled by default.
 }
 
-extern "C" {
 void tim2_isr(void) {}
+
 void tim3_isr(void) {
-  timer_clear_flag(command_timer.tim_, TIM_SR_UIF);
-  input_handler.stop();
+  if (timer_get_flag(TIM3, TIM_SR_UIF)) {
+    timer_clear_flag(TIM3, TIM_SR_UIF);
+    gpio_toggle(led_ir.port, led_ir.pin);
+  }
 }
 
 void exti1_isr(void) {
   exti_reset_request(EXTI1);
   input_handler.handle(input_handler);
 }
-}
 
-// extern "C" void main(void);
 int main(void) {
   nvic_get_irq_enabled(NVIC_EXTI1_IRQ);
-  clock_setup();
-  input_handler.setup();
-  // gpio_setup();
-  // carrier_tim_setup();
-  while (true) {
-  }
-}
-*/
-
-#include <libopencm3/cm3/nvic.h>
-#include <libopencm3/stm32/gpio.h>
-#include <libopencm3/stm32/rcc.h>
-#include <libopencm3/stm32/timer.h>
-
-#ifndef ARRAY_LEN
-#define ARRAY_LEN(array) (sizeof((array)) / sizeof((array)[0]))
-#endif
-
-#define LED1_PORT GPIOC
-#define LED1_PIN GPIO13
-
-/* Morse standard timings */
-#define ELEMENT_TIME 500
-#define DIT (1 * ELEMENT_TIME)
-#define DAH (3 * ELEMENT_TIME)
-#define INTRA (1 * ELEMENT_TIME)
-#define INTER (3 * ELEMENT_TIME)
-#define WORD (7 * ELEMENT_TIME)
-
-uint16_t frequency_sequence[] = {
-    DIT,   INTRA, DIT,   INTRA, DIT,   INTER, DAH,   INTRA, DAH,
-    INTRA, DAH,   INTER, DIT,   INTRA, DIT,   INTRA, DIT,   WORD,
-};
-
-int frequency_sel = 0;
-
-static void clock_setup(void) { rcc_clock_setup_in_hse_8mhz_out_72mhz(); }
-
-static void gpio_setup(void) {
-  /* Enable GPIO clock for leds. */
-  rcc_periph_clock_enable(RCC_GPIOC);
-
-  /* Enable led as output */
-  gpio_set_mode(LED1_PORT, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL,
-                LED1_PIN);
-  gpio_set(LED1_PORT, LED1_PIN);
-}
-
-void tim3_isr(void) {
-  if (timer_get_flag(TIM3, TIM_SR_UIF)) {
-    timer_clear_flag(TIM3, TIM_SR_UIF);
-    gpio_toggle(LED1_PORT, LED1_PIN);
-  }
-}
-
-int main(void) {
   clock_setup();
   gpio_setup();
   input_handler.setup();
