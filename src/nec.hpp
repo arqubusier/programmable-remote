@@ -84,26 +84,52 @@ public:
     timer_set_counter(timer_.tim_, 0);
   }
 
-  void setup() {
-    nvic_enable_irq(timer_.irqn_);
-    rcc_periph_reset_pulse(timer_.rst_tim_);
-    timer_set_mode(timer_.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
-                   TIM_CR1_DIR_UP);
+  static void setup(void) {
+    /* Enable TIM2 clock. */
+    rcc_periph_clock_enable(RCC_TIM3);
 
-    // timer_set_prescaler(timer_.tim_, timer_.input_clock_ /
-    // timer_.frequency_);
-    timer_set_prescaler(timer_.tim_, 65534);
-    timer_disable_preload(timer_.tim_);
-    timer_continuous_mode(timer_.tim_);
+    /* Enable TIM2 interrupt. */
+    nvic_enable_irq(NVIC_TIM3_IRQ);
 
-    timer_set_period(timer_.tim_, 65534);
-    timer_set_oc_value(timer_.tim_, TIM_OC1, 65534);
-    // timer_set_oc_value(timer_.tim_, TIM_OC1, timer_.auto_reload_period_);
+    /* Reset TIM2 peripheral to defaults. */
+    rcc_periph_reset_pulse(RST_TIM3);
 
-    // update event is enabled default.
-    timer_enable_irq(timer_.tim_, 0);
-    timer_enable_counter(timer_.tim_);
-    timer_enable_irq(timer_.tim_, TIM_DIER_CC1IE);
+    /* Timer global mode:
+     * - No divider
+     * - Alignment edge
+     * - Direction up
+     * (These are actually default values after reset above, so this call
+     * is strictly unnecessary, but demos the api for alternative settings)
+     */
+    timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+
+    /*
+     * Please take note that the clock source for STM32 timers
+     * might not be the raw APB1/APB2 clocks.  In various conditions they
+     * are doubled.  See the Reference Manual for full details!
+     * In our case, TIM2 on APB1 is running at double frequency, so this
+     * sets the prescaler to have the timer run at 5kHz
+     */
+    timer_set_prescaler(TIM3, ((rcc_apb1_frequency * 2) / 5000));
+
+    /* Disable preload. */
+    // timer_disable_preload(TIM2);
+    timer_continuous_mode(TIM3);
+
+    /* count full range, as we'll update compare value continuously */
+    // timer_set_period(TIM2, 65535);
+    timer_set_period(TIM3, 1000);
+
+    /* Set the initual output compare value for OC1. */
+    // timer_set_oc_value(TIM2, TIM_OC1, frequency_sequence[frequency_sel++]);
+    // timer_set_oc_value(TIM2, TIM_OC1, 1000);
+
+    /* Counter enable. */
+    timer_enable_counter(TIM3);
+
+    /* Enable Channel 1 compare interrupt to recalculate compare values */
+    // timer_enable_irq(TIM2, TIM_DIER_CC1IE);
+    timer_enable_irq(TIM3, TIM_DIER_UIE);
   }
 };
 
