@@ -58,8 +58,6 @@ public:
     uint32_t delta = timer_get_counter(timer_.tim_);
 
     if (state == 0) {
-
-      timer_set_counter(timer_.tim_, 20000);
       timer_enable_counter(timer_.tim_);
       result = CONTINUE;
     } else {
@@ -94,7 +92,7 @@ public:
     timer_continuous_mode(timer_.tim_);
     timer_set_period(timer_.tim_, 1000);
 
-    timer_enable_counter(timer_.tim_);
+    //timer_enable_counter(timer_.tim_);
     timer_enable_irq(timer_.tim_, TIM_DIER_UIE);
   }
 };

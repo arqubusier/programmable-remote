@@ -9,8 +9,13 @@
 #include "util.hpp"
 // constexpr uint32_t const command_timer_freq = 200 * KILO;
 
+uint32_t const cmd_timer_freq = 200 * KILO;
 // (rcc_apb1_frequency * 2)/ 5000 = 14400
-util::Timer cmd_timer{TIM3, TIM_OC1, 14400, 1000};
+// (rcc_apb1_frequency * 2)/ cmd_timer_freq = 360
+//util::Timer cmd_timer{TIM3, TIM_OC1, 360,
+//                      util::ns2count(cmd_timer_freq, 24*MEGA)};
+util::Timer cmd_timer{TIM3, TIM_OC1, 14400,
+                      1000};
 
 constexpr uint32_t const command_timer_freq = 200 * KILO;
 constexpr const util::timer_t command_timer{
@@ -54,8 +59,6 @@ static void clock_setup(void) {
   // Enable timer clocks.
   rcc_periph_clock_enable(carrier_timer.rcc_tim_);
   rcc_periph_reset_pulse(carrier_timer.rst_tim_);
-  rcc_periph_clock_enable(command_timer.rcc_tim_);
-  rcc_periph_reset_pulse(command_timer.rst_tim_);
 }
 
 static void gpio_setup(void) {
@@ -105,6 +108,7 @@ void tim2_isr(void) {}
 void tim3_isr(void) {
   if (timer_get_flag(TIM3, TIM_SR_UIF)) {
     timer_clear_flag(TIM3, TIM_SR_UIF);
+    //input_handler.stop();
     gpio_toggle(led_ir.port, led_ir.pin);
   }
 }
