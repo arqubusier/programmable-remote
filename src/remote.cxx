@@ -14,8 +14,8 @@ uint32_t const cmd_timer_freq = 200 * KILO;
 // (rcc_apb1_frequency * 2)/ cmd_timer_freq = 360
 //util::Timer cmd_timer{TIM3, TIM_OC1, 360,
 //                      util::ns2count(cmd_timer_freq, 24*MEGA)};
-util::Timer cmd_timer{TIM3, TIM_OC1, 14400,
-                      1000};
+util::Timer cmd_timer{TIM3, TIM_OC1, 360,
+                      util::ns2count(cmd_timer_freq, 24*MEGA)};
 
 constexpr uint32_t const command_timer_freq = 200 * KILO;
 constexpr const util::timer_t command_timer{
@@ -108,7 +108,7 @@ void tim2_isr(void) {}
 void tim3_isr(void) {
   if (timer_get_flag(TIM3, TIM_SR_UIF)) {
     timer_clear_flag(TIM3, TIM_SR_UIF);
-    //input_handler.stop();
+    input_handler.stop();
     gpio_toggle(led_ir.port, led_ir.pin);
   }
 }

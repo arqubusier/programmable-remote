@@ -70,18 +70,20 @@ public:
   }
 
   void stop() {
-    state_ = 0;
-    reset();
+    if (state_ > 1) {
+      state_ = 0;
+      reset();
+    }
   }
 
   void reset() {
+    nvic_disable_irq(util::GetTimerIrqn(timer_.tim_));
     timer_disable_counter(timer_.tim_);
     timer_set_counter(timer_.tim_, 0);
   }
 
   void setup(void) {
     rcc_periph_clock_enable(util::GetTimerRccPeriphClken(timer_.tim_));
-    nvic_enable_irq(util::GetTimerIrqn(timer_.tim_));
 
     // Reset timer peripheral to defaults.
     rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(timer_.tim_));
@@ -92,8 +94,9 @@ public:
     timer_continuous_mode(timer_.tim_);
     timer_set_period(timer_.tim_, 1000);
 
-    //timer_enable_counter(timer_.tim_);
+    // timer_enable_counter(timer_.tim_);
     timer_enable_irq(timer_.tim_, TIM_DIER_UIE);
+    nvic_enable_irq(util::GetTimerIrqn(timer_.tim_));
   }
 };
 
