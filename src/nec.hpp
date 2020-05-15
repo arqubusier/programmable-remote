@@ -11,7 +11,7 @@ public:
   uint32_t state_;
   util::Timer const &timer_;
   static const uint32_t MAX_TIMING_LIMIT = 100;
-  uint16_t timings_[MAX_TIMING_LIMIT];
+  uint32_t timings_[MAX_TIMING_LIMIT];
 
   PulseHandler(util::Timer const &timer) : state_{0}, timer_{timer} {}
 
@@ -56,23 +56,26 @@ public:
   Result handle_sub(uint32_t state) {
     Result result = ERROR;
     uint32_t delta = timer_get_counter(timer_.tim_);
+    timer_set_counter(timer_.tim_, 0);
 
     if (state == 0) {
       timer_enable_counter(timer_.tim_);
-      result = CONTINUE;
     } else {
       timings_[state - 1] = delta;
-      result = CONTINUE;
-      timer_set_counter(timer_.tim_, 0);
+      timer_clear_flag(timer_.tim_, TIM_SR_UIF);
     }
+    result = CONTINUE;
 
     return result;
   }
 
   void stop() {
-    if (state_ > 1) {
-      state_ = 0;
-      reset();
+    if (timer_get_flag(timer_.tim_, TIM_SR_UIF)) {
+      timer_clear_flag(timer_.tim_, TIM_SR_UIF);
+      if (state_ > 1) {
+        state_ = 0;
+        reset();
+      }
     }
   }
 
@@ -92,7 +95,7 @@ public:
                    TIM_CR1_DIR_UP);
     timer_set_prescaler(timer_.tim_, timer_.prescaler_);
     timer_continuous_mode(timer_.tim_);
-    timer_set_period(timer_.tim_, 1000);
+    timer_set_period(timer_.tim_, timer_.period_);
 
     // timer_enable_counter(timer_.tim_);
     timer_enable_irq(timer_.tim_, TIM_DIER_UIE);

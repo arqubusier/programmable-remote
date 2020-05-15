@@ -7,21 +7,10 @@
 #include "nec.hpp"
 
 #include "util.hpp"
-// constexpr uint32_t const command_timer_freq = 200 * KILO;
-
-uint32_t const cmd_timer_freq = 200 * KILO;
-// (rcc_apb1_frequency * 2)/ 5000 = 14400
-// (rcc_apb1_frequency * 2)/ cmd_timer_freq = 360
-//util::Timer cmd_timer{TIM3, TIM_OC1, 360,
-//                      util::ns2count(cmd_timer_freq, 24*MEGA)};
-util::Timer cmd_timer{TIM3, TIM_OC1, 360,
-                      util::ns2count(cmd_timer_freq, 24*MEGA)};
-
-constexpr uint32_t const command_timer_freq = 200 * KILO;
-constexpr const util::timer_t command_timer{
-    TIM3,      RCC_TIM3,          RST_TIM3, TIM_OC1, NVIC_TIM3_IRQ,
-    60000, // util::ns2count(command_timer_freq, 15 * MEGA),
-    72 * MEGA, command_timer_freq};
+uint32_t const cmd_timer_freq = 2 * MEGA;
+// (rcc_apb1_frequency * 2)/ cmd_timer_freq = 36
+util::Timer cmd_timer{TIM3, TIM_OC1, 36,
+                      util::ns2count(cmd_timer_freq, 24 * MEGA)};
 
 // Do not divide clock for highest possible resolution
 // Frequency is ABP1 clock * 2 = 36 MHz.
@@ -32,8 +21,6 @@ constexpr const util::timer_t command_timer{
 // 1 period = 474 * (1/36MHz) = 13.1666... us
 constexpr const util::timer_t carrier_timer{TIM2, RCC_TIM2, RST_TIM2, TIM_OC1,
                                             0,    474,      1,        1};
-// constexpr const util::timer_t carrier_timer{TIM3, RCC_TIM3, RST_TIM3,
-// TIM_OC1, 474, 1};
 
 // constexpr const util::io_t output_ir{GPIOA,GPIO8}; // TIM1 CH1 output
 constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
@@ -106,11 +93,8 @@ static void carrier_tim_setup(void) {
 void tim2_isr(void) {}
 
 void tim3_isr(void) {
-  if (timer_get_flag(TIM3, TIM_SR_UIF)) {
-    timer_clear_flag(TIM3, TIM_SR_UIF);
-    input_handler.stop();
-    gpio_toggle(led_ir.port, led_ir.pin);
-  }
+  input_handler.stop();
+  gpio_toggle(led_ir.port, led_ir.pin);
 }
 
 void exti1_isr(void) {
