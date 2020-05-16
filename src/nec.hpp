@@ -2,16 +2,21 @@
 #define NEC_HPP
 #include "etl/algorithm.h"
 #include "etl/array.h"
+#include "etl/vector.h"
 #include <libopencm3/stm32/timer.h>
 #include <stdint.h>
 
 #include "util.hpp"
 
+struct Timings {
+  static const uint16_t MAX_TIMING_LIMIT = 100;
+  etl::array<uint16_t, MAX_TIMING_LIMIT> array;
+  size_t size;
+};
+
 class PulseHandler {
 public:
   enum Result { CONTINUE, STOP, ERROR };
-  static const uint16_t MAX_TIMING_LIMIT = 100;
-  using Timings = etl::array<uint16_t, MAX_TIMING_LIMIT>;
 
   uint32_t state_;
   Timings timings_;
@@ -20,7 +25,7 @@ public:
 
   template <typename HandlerImplementationT>
   void handle(HandlerImplementationT &handler_implementation) {
-    if (state_ >= MAX_TIMING_LIMIT) {
+    if (state_ >= Timings::MAX_TIMING_LIMIT) {
       state_ = 0;
       handler_implementation.reset();
       fail();
@@ -64,8 +69,10 @@ public:
 
     if (state == 0) {
       timer_enable_counter(timer_.tim_);
+      timings_.size = 0;
     } else {
-      timings_[state - 1] = delta;
+      timings_.array[timings_.size] = delta;
+      timings_.size++;
       timer_clear_flag(timer_.tim_, TIM_SR_UIF);
     }
     result = CONTINUE;
@@ -101,7 +108,6 @@ public:
     timer_continuous_mode(timer_.tim_);
     timer_set_period(timer_.tim_, timer_.period_);
 
-    // timer_enable_counter(timer_.tim_);
     timer_enable_irq(timer_.tim_, TIM_DIER_UIE);
     nvic_enable_irq(util::GetTimerIrqn(timer_.tim_).first);
   }
@@ -121,8 +127,11 @@ public:
    * active when the timer is enabled.
    */
   void send(const Timings &to_send) {
-    etl::copy(to_send.begin(), to_send.end(), timings_.begin());
-    timer_set_period(cmd_timer_.tim_, timings_[0]);
+    etl::copy(to_send.array.begin(), to_send.array.begin() + to_send.size,
+              timings_.array.begin());
+    timings_.size = to_send.size;
+    timer_set_period(cmd_timer_.tim_, timings_.array[0]);
+    // uint16_t x = timings_[0];
     timer_enable_counter(cmd_timer_.tim_);
     timer_enable_counter(carrier_timer_.tim_);
     timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
@@ -135,14 +144,23 @@ public:
   Result handle_sub(uint32_t state) {
     Result result = ERROR;
 
-    if ((state % 2) == 0) {
-      timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-    } else {
-      timer_disable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-    }
-    timer_set_period(cmd_timer_.tim_, timings_[state + 1]);
+    if (timer_get_flag(cmd_timer_.tim_, TIM_SR_UIF)) {
+      timer_clear_flag(cmd_timer_.tim_, TIM_SR_UIF);
 
-    result = CONTINUE;
+      if ((state % 2) == 0) {
+        timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
+      } else {
+        timer_disable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
+      }
+      timer_set_period(cmd_timer_.tim_, timings_.array[state + 1]);
+
+      if (state + 1 < timings_.size - 1) {
+        result = CONTINUE;
+      } else {
+        result = STOP;
+      }
+    }
+
     return result;
   }
 
@@ -167,7 +185,7 @@ private:
     timer_continuous_mode(cmd_timer_.tim_);
     timer_set_period(cmd_timer_.tim_, cmd_timer_.period_);
 
-    // timer_enable_counter(timer_.tim_);
+    // TODO enable preload
     timer_enable_irq(cmd_timer_.tim_, TIM_DIER_UIE);
     nvic_enable_irq(util::GetTimerIrqn(cmd_timer_.tim_).first);
   }
@@ -183,7 +201,6 @@ private:
 
     timer_set_prescaler(carrier_timer_.tim_, carrier_timer_.prescaler_);
     timer_continuous_mode(carrier_timer_.tim_);
-    // TODO enable preload
 
     timer_set_period(carrier_timer_.tim_, carrier_timer_.period_);
 
