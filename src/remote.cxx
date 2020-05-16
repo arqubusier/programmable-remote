@@ -11,16 +11,11 @@ uint32_t const cmd_timer_freq = 2 * MEGA;
 // (rcc_apb1_frequency * 2)/ cmd_timer_freq = 36
 util::Timer cmd_timer{TIM3, TIM_OC1, 36,
                       util::ns2count(cmd_timer_freq, 24 * MEGA)};
-
+util::Timer output_timer{TIM4, TIM_OC1, 36, 0};
 // Do not divide clock for highest possible resolution
-// Frequency is ABP1 clock * 2 = 36 MHz.
-// 1 period = 947 * (1/72MHz) = 13.15277... us
-// constexpr const util::timer_t carrier_timer{TIM1, RCC_TIM1, RST_TIM1,
-// TIM_OC1, 474, 1};
-// Frequency is ABP2 clock * 2 = 72 MHz.
-// 1 period = 474 * (1/36MHz) = 13.1666... us
-constexpr const util::timer_t carrier_timer{TIM2, RCC_TIM2, RST_TIM2, TIM_OC1,
-                                            0,    474,      1,        1};
+// Frequency is ABP1 clock * 2 = 72 MHz.
+// 1 period = 947 * (1/72MHz) = 13.15277... us <=> 76 KHz = 2*38 Khz
+util::Timer carrier_timer{TIM4, TIM_OC1, 0, 0};
 
 // constexpr const util::io_t output_ir{GPIOA,GPIO8}; // TIM1 CH1 output
 constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
@@ -30,6 +25,7 @@ constexpr const util::io_t input_ir{GPIOA, GPIO1};
 constexpr const util::io_t led_ir{GPIOC, GPIO13};
 
 InputHandler input_handler{cmd_timer};
+OutputHandler output_handler{cmd_timer, carrier_timer};
 
 static void clock_setup(void) {
   rcc_clock_setup_in_hse_8mhz_out_72mhz();
@@ -42,10 +38,6 @@ static void clock_setup(void) {
 
   // Enable AFIO clock for timers.
   rcc_periph_clock_enable(RCC_AFIO);
-
-  // Enable timer clocks.
-  rcc_periph_clock_enable(carrier_timer.rcc_tim_);
-  rcc_periph_reset_pulse(carrier_timer.rst_tim_);
 }
 
 static void gpio_setup(void) {
@@ -67,33 +59,13 @@ static void gpio_setup(void) {
   exti_enable_request(EXTI1);
 }
 
-static void carrier_tim_setup(void) {
-  // Timer global mode:
-  // - No divider
-  // - Up-couning (Alignment edge, Direction up)
-  timer_set_mode(carrier_timer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
-                 TIM_CR1_DIR_UP);
-
-  timer_set_prescaler(carrier_timer.tim_, carrier_timer.frequency_);
-  timer_continuous_mode(carrier_timer.tim_);
-
-  timer_set_period(carrier_timer.tim_, carrier_timer.auto_reload_period_);
-
-  timer_set_oc_value(carrier_timer.tim_, carrier_timer.channel_,
-                     carrier_timer.auto_reload_period_);
-  timer_set_oc_mode(carrier_timer.tim_, carrier_timer.channel_, TIM_OCM_TOGGLE);
-  timer_enable_oc_output(carrier_timer.tim_, carrier_timer.channel_);
-
-  // Counter enable.
-  timer_enable_counter(carrier_timer.tim_);
-
-  // interrupts and DMA requests are disabled by default.
-}
-
-void tim2_isr(void) {}
-
 void tim3_isr(void) {
   input_handler.stop();
+  gpio_toggle(led_ir.port, led_ir.pin);
+}
+
+void tim4_isr(void) {
+  output_handler.handle(output_handler);
   gpio_toggle(led_ir.port, led_ir.pin);
 }
 

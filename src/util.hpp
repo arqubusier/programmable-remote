@@ -1,6 +1,7 @@
 #ifndef UTIL_HPP
 #define UTIL_HPP
 
+#include "etl/optional.h"
 #include <stdint.h>
 
 #ifdef TEST
@@ -19,41 +20,45 @@ constexpr const uint32_t KILO = 1000;
 
 namespace util {
 
-constexpr rcc_periph_clken GetTimerRccPeriphClken(uint32_t tim) {
+constexpr etl::pair<rcc_periph_clken, bool>
+GetTimerRccPeriphClken(uint32_t tim) {
   switch (tim) {
   case TIM1:
-    return RCC_TIM1;
+    return {RCC_TIM1, true};
   case TIM2:
-    return RCC_TIM2;
+    return {RCC_TIM2, true};
   case TIM3:
-    return RCC_TIM3;
+    return {RCC_TIM3, true};
   case TIM4:
-    return RCC_TIM4;
+    return {RCC_TIM4, true};
   }
+  return {RCC_TIM1, false};
 }
 
-constexpr rcc_periph_rst GetTimerRccPeriphRst(uint32_t tim) {
+constexpr etl::pair<rcc_periph_rst, bool> GetTimerRccPeriphRst(uint32_t tim) {
   switch (tim) {
   case TIM1:
-    return RST_TIM1;
+    return {RST_TIM1, true};
   case TIM2:
-    return RST_TIM2;
+    return {RST_TIM2, true};
   case TIM3:
-    return RST_TIM3;
+    return {RST_TIM3, true};
   case TIM4:
-    return RST_TIM4;
+    return {RST_TIM4, true};
   }
+  return {RST_TIM4, false};
 }
 
-constexpr uint8_t GetTimerIrqn(uint32_t tim) {
+constexpr etl::pair<uint8_t, bool> GetTimerIrqn(uint32_t tim) {
   switch (tim) {
   case TIM2:
-    return NVIC_TIM2_IRQ;
+    return {NVIC_TIM2_IRQ, true};
   case TIM3:
-    return NVIC_TIM3_IRQ;
+    return {NVIC_TIM3_IRQ, true};
   case TIM4:
-    return NVIC_TIM4_IRQ;
+    return {NVIC_TIM4_IRQ, true};
   }
+  return {0, false};
 }
 
 struct Timer {
