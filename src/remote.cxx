@@ -92,13 +92,11 @@ int main(void) {
   output_handler.setup();
 
   Timings ok_cmd{};
-  ok_cmd.array[0] = 2000;
+  ok_cmd.array[0] = 16213;
   ok_cmd.array[1] = 4000;
-  ok_cmd.array[0] = 2000;
-  ok_cmd.array[1] = 4000;
-  ok_cmd.size = 1;
-  // ok_cmd.array[0] = 16213;
-  // ok_cmd.array[1] = 16213;
+  ok_cmd.array[2] = 8000;
+  ok_cmd.array[3] = 8000;
+  ok_cmd.size = 3;
   // prescaler 36
   //{16213, 8792, 1142, 1052, 1097, 1096, 1091, 3306, 1141, 1053, 1143, 1048,
   // 1092, 1099, 1094, 1097, 1091, 3304, 1101, 1095, 1142, 1050, 1091, 3306,
@@ -110,7 +108,7 @@ int main(void) {
   while (1) {
     output_handler.send(ok_cmd);
     gpio_toggle(led_ir.port, led_ir.pin);
-    for (size_t i = 0; i < 200000; i++) // Wait a bit.
+    for (size_t i = 0; i < 4000000; i++) // Wait a bit.
       __asm__("nop");
     ;
   }

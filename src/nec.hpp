@@ -130,6 +130,7 @@ public:
     etl::copy(to_send.array.begin(), to_send.array.begin() + to_send.size,
               timings_.array.begin());
     timings_.size = to_send.size;
+    // Prepare delta for first segment
     timer_set_period(cmd_timer_.tim_, timings_.array[0]);
     timer_enable_counter(cmd_timer_.tim_);
     timer_enable_counter(carrier_timer_.tim_);
@@ -149,20 +150,23 @@ public:
       timer_clear_flag(cmd_timer_.tim_, TIM_SR_UIF);
 
       result = STOP;
-      if ((state % 2) == 0) {
+      if ((state % 2) == 1) {
         // next segment is carrier pulse
         timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-        if (state < timings_.size) {
-          timer_set_period(cmd_timer_.tim_, timings_.array[state]);
+        if (state + 1 < timings_.size) {
           result = CONTINUE;
         }
       } else {
         // next segment is space
         timer_disable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-        if (state < timings_.size - 1) {
-          timer_set_period(cmd_timer_.tim_, timings_.array[state]);
+        if (state + 1< timings_.size - 1) {
           result = CONTINUE;
         }
+      }
+
+      // Prepare delta for coming segment
+      if (state + 1 < timings_.size) {
+        timer_set_period(cmd_timer_.tim_, timings_.array[state + 1]);
       }
     }
 
