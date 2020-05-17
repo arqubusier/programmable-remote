@@ -24,6 +24,7 @@ constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
 
 constexpr const util::io_t input_ir{GPIOA, GPIO1};
 constexpr const util::io_t led_ir{GPIOC, GPIO13};
+constexpr const util::io_t led_fail{GPIOA, GPIO2};
 
 InputHandler input_handler{cmd_timer};
 OutputHandler output_handler{output_timer, carrier_timer};
@@ -33,8 +34,9 @@ static void clock_setup(void) {
 
   // Enable GPIO clock for leds.
   rcc_periph_clock_enable(RCC_GPIOC);
-
   // Enable GPIO clock for IR input.
+  rcc_periph_clock_enable(RCC_GPIOA);
+  // Enable GPIO clock for fail led.
   rcc_periph_clock_enable(RCC_GPIOA);
 
   // Enable AFIO clock for timers.
@@ -45,6 +47,11 @@ static void gpio_setup(void) {
   // Enable led as output
   gpio_set_mode(led_ir.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL,
                 led_ir.pin);
+  gpio_set(led_ir.port, led_ir.pin);
+
+  // Enable fail led as output
+  gpio_set_mode(led_fail.port, GPIO_MODE_OUTPUT_50_MHZ,
+                GPIO_CNF_OUTPUT_PUSHPULL, led_fail.pin);
   gpio_set(led_ir.port, led_ir.pin);
 
   // carrier timer output compare value on pin, connect to ir led.
@@ -61,20 +68,16 @@ static void gpio_setup(void) {
 }
 
 extern "C" {
-void tim3_isr(void) {
-  input_handler.stop();
-  output_handler.handle(output_handler);
-  gpio_toggle(led_ir.port, led_ir.pin);
-}
-
-void tim4_isr(void) {
-  output_handler.handle(output_handler);
-  gpio_toggle(led_ir.port, led_ir.pin);
-}
-
 void exti1_isr(void) {
   exti_reset_request(EXTI1);
   input_handler.handle(input_handler);
+}
+
+void tim3_isr(void) { input_handler.stop(); }
+
+void tim4_isr(void) {
+  output_handler.handle(output_handler);
+  gpio_toggle(led_fail.port, led_fail.pin);
 }
 }
 
@@ -89,9 +92,13 @@ int main(void) {
   output_handler.setup();
 
   Timings ok_cmd{};
-  ok_cmd.array[0] = 16213;
-  ok_cmd.array[1] = 16213;
-  ok_cmd.size = 2;
+  ok_cmd.array[0] = 2000;
+  ok_cmd.array[1] = 4000;
+  ok_cmd.array[0] = 2000;
+  ok_cmd.array[1] = 4000;
+  ok_cmd.size = 1;
+  // ok_cmd.array[0] = 16213;
+  // ok_cmd.array[1] = 16213;
   // prescaler 36
   //{16213, 8792, 1142, 1052, 1097, 1096, 1091, 3306, 1141, 1053, 1143, 1048,
   // 1092, 1099, 1094, 1097, 1091, 3304, 1101, 1095, 1142, 1050, 1091, 3306,
@@ -99,9 +106,12 @@ int main(void) {
   // 1143, 1050, 1144, 1048, 1143, 1048, 1091, 3306, 1142, 1050, 1093, 1099,
   // 1093, 3304, 1092, 3304, 1092, 3308, 1090, 3305, 1093, 3305, 1094, 1100,
   // 1088, 3308, 1091, 3306, 1145, 1047, 1092};
-  output_handler.send(ok_cmd);
 
   while (1) {
+    output_handler.send(ok_cmd);
+    gpio_toggle(led_ir.port, led_ir.pin);
+    for (size_t i = 0; i < 200000; i++) // Wait a bit.
+      __asm__("nop");
     ;
   }
 

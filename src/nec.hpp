@@ -131,7 +131,6 @@ public:
               timings_.array.begin());
     timings_.size = to_send.size;
     timer_set_period(cmd_timer_.tim_, timings_.array[0]);
-    // uint16_t x = timings_[0];
     timer_enable_counter(cmd_timer_.tim_);
     timer_enable_counter(carrier_timer_.tim_);
     timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
@@ -144,27 +143,38 @@ public:
   Result handle_sub(uint32_t state) {
     Result result = ERROR;
 
+    // Interrupt fires immediately when timer is enabled, therefore
+    // We effectively start with state_ == 1
     if (timer_get_flag(cmd_timer_.tim_, TIM_SR_UIF)) {
       timer_clear_flag(cmd_timer_.tim_, TIM_SR_UIF);
 
+      result = STOP;
       if ((state % 2) == 0) {
+        // next segment is carrier pulse
         timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
+        if (state < timings_.size) {
+          timer_set_period(cmd_timer_.tim_, timings_.array[state]);
+          result = CONTINUE;
+        }
       } else {
+        // next segment is space
         timer_disable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-      }
-      timer_set_period(cmd_timer_.tim_, timings_.array[state + 1]);
-
-      if (state + 1 < timings_.size - 1) {
-        result = CONTINUE;
-      } else {
-        result = STOP;
+        if (state < timings_.size - 1) {
+          timer_set_period(cmd_timer_.tim_, timings_.array[state]);
+          result = CONTINUE;
+        }
       }
     }
 
     return result;
   }
 
-  void reset(){};
+  void reset() {
+    timer_disable_counter(cmd_timer_.tim_);
+    timer_disable_counter(carrier_timer_.tim_);
+    timer_disable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
+    timer_set_counter(cmd_timer_.tim_, 0);
+  }
 
   void setup(void) {
     setup_cmd_timer();
