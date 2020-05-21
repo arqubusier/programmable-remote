@@ -9,9 +9,11 @@ using rcc_periph_clken = uint32_t;
 using rcc_periph_rst = uint32_t;
 using tim_oc_id = uint32_t;
 #else
+#include <libopencm3/cm3/cortex.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/timer.h>
+#include <libopencmsis/core_cm3.h>
 #endif
 
 constexpr const uint32_t GIGA = 1000000000;
@@ -130,6 +132,45 @@ struct io_t {
 bool valid_delta(uint32_t delta, uint32_t target, uint32_t threshold) {
   return (delta > target - threshold && delta < target + threshold);
 }
+
+/*
+ * \brief   A guard that will attempt to lock upon scope entry.
+ *
+ * Always unlocks upon leaving the scope. Works by disabling
+ * configurable interrupts. Only works for single core, in-order
+ * processors.
+ */
+class try_lock_guard {
+  static bool locked_;
+  bool lock_owned_;
+
+public:
+  try_lock_guard() : lock_owned_{false} {
+    bool interrupts_were_enabled = !cm_is_masked_interrupts();
+    __disable_irq();
+    if (!locked_) {
+      locked_ = true;
+      lock_owned_ = true;
+    }
+
+    // Prevent premature enabling of interrupts if they were already
+    // disabled by the caller.
+    if (interrupts_were_enabled) {
+      __enable_irq();
+    }
+  }
+
+  ~try_lock_guard() {
+    if (lock_owned_) {
+      // No need to disable interrutps since stores are atomic
+      locked_ = false;
+    }
+    lock_owned_ = false;
+  }
+
+  bool owned() { return lock_owned_; }
+};
+bool try_lock_guard::locked_ = false;
 
 } // namespace util
 
