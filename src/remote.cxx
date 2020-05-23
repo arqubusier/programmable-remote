@@ -26,8 +26,10 @@ constexpr const util::io_t input_ir{GPIOA, GPIO1};
 constexpr const util::io_t led_ir{GPIOC, GPIO13};
 constexpr const util::io_t led_fail{GPIOA, GPIO2};
 
-InputHandler input_handler{cmd_timer};
-OutputHandler output_handler{output_timer, carrier_timer};
+bool input_lock{false};
+bool output_lock{false};
+InputHandler input_handler{input_lock, cmd_timer};
+OutputHandler output_handler{output_lock, output_timer, carrier_timer};
 
 static void clock_setup(void) {
   rcc_clock_setup_in_hse_8mhz_out_72mhz();
@@ -92,11 +94,11 @@ int main(void) {
   output_handler.setup();
 
   Timings ok_cmd{};
-  ok_cmd.array[0] = 16213;
-  ok_cmd.array[1] = 4000;
-  ok_cmd.array[2] = 8000;
-  ok_cmd.array[3] = 8000;
-  ok_cmd.size = 3;
+  ok_cmd.array_[0] = 16213;
+  ok_cmd.array_[1] = 4000;
+  ok_cmd.array_[2] = 8000;
+  ok_cmd.array_[3] = 8000;
+  ok_cmd.size_ = 3;
   // prescaler 36
   //{16213, 8792, 1142, 1052, 1097, 1096, 1091, 3306, 1141, 1053, 1143, 1048,
   // 1092, 1099, 1094, 1097, 1091, 3304, 1101, 1095, 1142, 1050, 1091, 3306,
@@ -105,8 +107,37 @@ int main(void) {
   // 1093, 3304, 1092, 3304, 1092, 3308, 1090, 3305, 1093, 3305, 1094, 1100,
   // 1088, 3308, 1091, 3306, 1145, 1047, 1092};
 
+  /* Power projector
+  $1 = {static MAX_TIMING_LIMIT = 100, array_ = {_buffer = {16189, 8691, 1158,
+  3224, 1150, 3228, 1157, 1039, 1162, 1030, 1164, 1027, 1164, 1029, 1223, 970,
+  1221, 3153, 1150, 3229, 1223, 973, 1219, 3155, 1149, 1048, 1221, 3152, 1152,
+  1045, 1222, 3154, 1153, 1043, 1163, 1029, 1212, 982, 1222, 972, 1163, 1031,
+  1224, 3149, 1156, 1041, 1221, 971, 1223, 3154, 1226, 3153, 1162, 3217, 1148,
+  3232, 1163, 3217, 1156, 1040, 1163, 3213, 1148, 3232, 1161, 1035, 1162, 0
+  <repeats 33 times>}}, size_ = 67}
+  */
+
+  /* projector menu
+    $2 = {static MAX_TIMING_LIMIT = 100, array_ = {_buffer = {16197, 8671, 1234,
+    3147, 1249, 3127, 1258, 936, 1261, 932, 1263, 928, 1256, 933, 1260, 931,
+    1256, 3119, 1260, 3116, 1194, 1000, 1261, 3114, 1224, 970, 1248, 3124, 1217,
+    979, 1261, 3113, 1262, 932, 1162, 1030, 1260, 3113, 1252, 943, 1262, 3113,
+    1164, 3215, 1236, 958, 1261, 954, 1228, 3122, 1217, 3161, 1261, 934, 1269,
+    3105, 1241, 953, 1228, 965, 1257, 3119, 1260, 3118, 1263, 929, 1262, 0
+    <repeats 33 times>}}, size_ = 67}
+
+   */
+  Timings menu_cmd(67,
+                   {16197, 8671, 1234, 3147, 1249, 3127, 1258, 936,  1261, 932,
+                    1263,  928,  1256, 933,  1260, 931,  1256, 3119, 1260, 3116,
+                    1194,  1000, 1261, 3114, 1224, 970,  1248, 3124, 1217, 979,
+                    1261,  3113, 1262, 932,  1162, 1030, 1260, 3113, 1252, 943,
+                    1262,  3113, 1164, 3215, 1236, 958,  1261, 954,  1228, 3122,
+                    1217,  3161, 1261, 934,  1269, 3105, 1241, 953,  1228, 965,
+                    1257,  3119, 1260, 3118, 1263, 929,  1262});
+
   while (1) {
-    output_handler.send(ok_cmd);
+    output_handler.send(menu_cmd);
     gpio_toggle(led_ir.port, led_ir.pin);
     for (size_t i = 0; i < 4000000; i++) // Wait a bit.
       __asm__("nop");

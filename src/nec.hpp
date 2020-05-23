@@ -10,18 +10,26 @@
 
 struct Timings {
   static const uint16_t MAX_TIMING_LIMIT = 100;
-  etl::array<uint16_t, MAX_TIMING_LIMIT> array;
-  size_t size;
+  using array_t = etl::array<uint16_t, MAX_TIMING_LIMIT>;
+
+  Timings(size_t size, array_t array) : size_{size}, array_{array} {}
+  Timings() = default;
+  Timings(const Timings &) = default;
+
+  size_t size_;
+  etl::array<uint16_t, MAX_TIMING_LIMIT> array_;
 };
 
 class PulseHandler {
-public:
+protected:
   enum Result { CONTINUE, STOP, ERROR };
 
+  bool &lock_;
   uint32_t state_;
   Timings timings_;
 
-  PulseHandler() : state_{0}, timings_{} {}
+public:
+  PulseHandler(bool &lock) : lock_{lock}, state_{0}, timings_{} {}
 
   template <typename HandlerImplementationT>
   void handle(HandlerImplementationT &handler_implementation) {
@@ -60,7 +68,8 @@ class InputHandler final : public PulseHandler {
   util::Timer const &timer_;
 
 public:
-  InputHandler(util::Timer const &timer) : timer_{timer} {}
+  InputHandler(bool &lock, util::Timer const &timer)
+      : PulseHandler{lock}, timer_{timer} {}
 
   Result handle_sub(uint32_t state) {
     Result result = ERROR;
@@ -69,10 +78,10 @@ public:
 
     if (state == 0) {
       timer_enable_counter(timer_.tim_);
-      timings_.size = 0;
+      timings_.size_ = 0;
     } else {
-      timings_.array[timings_.size] = delta;
-      timings_.size++;
+      timings_.array_[timings_.size_] = delta;
+      timings_.size_++;
       timer_clear_flag(timer_.tim_, TIM_SR_UIF);
     }
     result = CONTINUE;
@@ -118,8 +127,10 @@ class OutputHandler final : public PulseHandler {
   util::Timer carrier_timer_;
 
 public:
-  OutputHandler(util::Timer const &cmd_timer, util::Timer const &carrier_timer)
-      : cmd_timer_{cmd_timer}, carrier_timer_{carrier_timer} {}
+  OutputHandler(bool &lock, util::Timer const &cmd_timer,
+                util::Timer const &carrier_timer)
+      : PulseHandler{lock}, cmd_timer_{cmd_timer}, carrier_timer_{
+                                                       carrier_timer} {}
 
   /*! \brief   Start send command.
    *  \details Enables timer with the first timeout value. Enables carrier timer
@@ -127,11 +138,11 @@ public:
    * active when the timer is enabled.
    */
   void send(const Timings &to_send) {
-    etl::copy(to_send.array.begin(), to_send.array.begin() + to_send.size,
-              timings_.array.begin());
-    timings_.size = to_send.size;
+    etl::copy(to_send.array_.begin(), to_send.array_.begin() + to_send.size_,
+              timings_.array_.begin());
+    timings_.size_ = to_send.size_;
     // Prepare delta for first segment
-    timer_set_period(cmd_timer_.tim_, timings_.array[0]);
+    timer_set_period(cmd_timer_.tim_, timings_.array_[0]);
     timer_enable_counter(cmd_timer_.tim_);
     timer_enable_counter(carrier_timer_.tim_);
     timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
@@ -153,20 +164,20 @@ public:
       if ((state % 2) == 1) {
         // next segment is carrier pulse
         timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-        if (state + 1 < timings_.size) {
+        if (state + 1 < timings_.size_) {
           result = CONTINUE;
         }
       } else {
         // next segment is space
         timer_disable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-        if (state + 1< timings_.size - 1) {
+        if (state + 1 < timings_.size_ - 1) {
           result = CONTINUE;
         }
       }
 
       // Prepare delta for coming segment
-      if (state + 1 < timings_.size) {
-        timer_set_period(cmd_timer_.tim_, timings_.array[state + 1]);
+      if (state + 1 < timings_.size_) {
+        timer_set_period(cmd_timer_.tim_, timings_.array_[state + 1]);
       }
     }
 

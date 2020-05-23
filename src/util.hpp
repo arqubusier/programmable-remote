@@ -141,11 +141,11 @@ bool valid_delta(uint32_t delta, uint32_t target, uint32_t threshold) {
  * processors.
  */
 class try_lock_guard {
-  static bool locked_;
+  bool &locked_;
   bool lock_owned_;
 
 public:
-  try_lock_guard() : lock_owned_{false} {
+  try_lock_guard(bool &locked) : locked_{locked}, lock_owned_{false} {
     bool interrupts_were_enabled = !cm_is_masked_interrupts();
     __disable_irq();
     if (!locked_) {
@@ -170,7 +170,6 @@ public:
 
   bool owned() { return lock_owned_; }
 };
-bool try_lock_guard::locked_ = false;
 
 } // namespace util
 
