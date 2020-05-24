@@ -5,8 +5,9 @@
 #include <libopencm3/stm32/timer.h>
 
 #include "nec.hpp"
-
+#include "statemachine.hpp"
 #include "util.hpp"
+
 uint32_t const cmd_timer_freq = 2 * MEGA;
 // (rcc_apb1_frequency * 2)/ cmd_timer_freq = 36
 util::Timer cmd_timer{TIM3, TIM_OC1, 36,
