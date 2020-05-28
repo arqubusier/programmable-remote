@@ -1,8 +1,8 @@
 #ifndef UTIL_HPP
 #define UTIL_HPP
 
-#include "etl/optional.h"
 #include <stdint.h>
+#include "etl/utility.h"
 
 #ifdef TEST
 using rcc_periph_clken = uint32_t;
@@ -21,7 +21,7 @@ constexpr const uint32_t MEGA = 1000000;
 constexpr const uint32_t KILO = 1000;
 
 namespace util {
-
+#ifndef TEST
 constexpr etl::pair<rcc_periph_clken, bool>
 GetTimerRccPeriphClken(uint32_t tim) {
   switch (tim) {
@@ -62,6 +62,7 @@ constexpr etl::pair<uint8_t, bool> GetTimerIrqn(uint32_t tim) {
   }
   return {0, false};
 }
+#endif
 
 struct Timer {
   uint32_t tim_;
@@ -133,6 +134,8 @@ bool valid_delta(uint32_t delta, uint32_t target, uint32_t threshold) {
   return (delta > target - threshold && delta < target + threshold);
 }
 
+
+#ifndef TEST
 /*
  * \brief   A guard that will attempt to lock upon scope entry.
  *
@@ -170,6 +173,7 @@ public:
 
   bool owned() { return lock_owned_; }
 };
+#endif // TEST
 
 } // namespace util
 
