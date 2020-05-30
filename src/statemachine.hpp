@@ -1,9 +1,7 @@
 #ifndef STATEMACHINE_HPP
 #define STATEMACHINE_HPP
 
-#include <cassert>
-#include <utility>
-#include <variant>
+#include "util.hpp"
 
 struct EventId {
   enum {
@@ -28,27 +26,6 @@ struct StateId {
   };
 };
 
-template <typename... States> using StateStorage = std::variant<States...>;
-
-template <typename StateStorage> class StateMachine {
-  StateStorage state_{};
-
-public:
-  template <typename Event> void send(const Event &event) {
-    state_ = std::visit(
-        [&event = event](auto &&state) { return state.receive(event); },
-        state_);
-  }
-};
-
-template <typename StateStorage> struct StateBase {
-  /*! \brief Default action must not trigger on a correctly defined state
-   * machine. */
-  template <typename Event> StateStorage Receive(const Event &) {
-    assert(false);
-  }
-};
-
 class ButtonNumber {};
 class ButtonNext {};
 
@@ -56,11 +33,11 @@ class RemoteState;
 class Idling;
 class Sending;
 
-using RemoteStates = StateStorage<Idling, Sending>;
+using RemoteStates = util::StateStorage<Idling, Sending>;
 
-class Idling : public StateBase<RemoteStates> {};
-class Sending : public StateBase<RemoteStates> {};
+class Idling : public util::StateBase<RemoteStates> {};
+class Sending : public util::StateBase<RemoteStates> {};
 
-StateMachine<RemoteStates> sm;
+util::StateMachine<RemoteStates> sm;
 
 #endif // STATEMACHINE_HPP

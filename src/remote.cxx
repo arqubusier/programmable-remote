@@ -4,9 +4,9 @@
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/timer.h>
 
-#include "nec.hpp"
+#include "ir.hpp"
 #include "statemachine.hpp"
-#include "util.hpp"
+#include "util_libopencm3.hpp"
 
 uint32_t const cmd_timer_freq = 2 * MEGA;
 // (rcc_apb1_frequency * 2)/ cmd_timer_freq = 36

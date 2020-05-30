@@ -1,12 +1,11 @@
-#ifndef NEC_HPP
-#define NEC_HPP
-#include "etl/algorithm.h"
-#include "etl/array.h"
-#include "etl/vector.h"
-#include <libopencm3/stm32/timer.h>
+#ifndef IR_HPP
+#define IR_HPP
 #include <stdint.h>
 
-#include "util.hpp"
+#include "etl/array.h"
+#include <libopencm3/stm32/timer.h>
+
+#include "util_libopencm3.hpp"
 
 struct Timings {
   static const uint16_t MAX_TIMING_LIMIT = 100;
@@ -237,4 +236,4 @@ private:
     // interrupts and DMA requests are disabled by default.
   }
 };
-#endif // NEC_HPP
+#endif // IR_HPP
