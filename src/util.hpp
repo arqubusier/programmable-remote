@@ -1,8 +1,9 @@
 #ifndef UTIL_HPP
 #define UTIL_HPP
 
-#include <stdint.h>
 #include "etl/utility.h"
+#include <cstdlib>
+#include <stdint.h>
 
 #ifdef TEST
 using rcc_periph_clken = uint32_t;
@@ -21,6 +22,9 @@ constexpr const uint32_t MEGA = 1000000;
 constexpr const uint32_t KILO = 1000;
 
 namespace util {
+
+#define assert(condition) ((!condition) ? (void)0 : std::abort())
+
 #ifndef TEST
 constexpr etl::pair<rcc_periph_clken, bool>
 GetTimerRccPeriphClken(uint32_t tim) {
@@ -133,7 +137,6 @@ struct io_t {
 bool valid_delta(uint32_t delta, uint32_t target, uint32_t threshold) {
   return (delta > target - threshold && delta < target + threshold);
 }
-
 
 #ifndef TEST
 /*

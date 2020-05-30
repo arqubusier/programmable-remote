@@ -1,6 +1,7 @@
 #ifndef STATEMACHINE_HPP
 #define STATEMACHINE_HPP
 
+#include <cassert>
 #include <utility>
 #include <variant>
 
@@ -27,50 +28,25 @@ struct StateId {
   };
 };
 
-/*!
- * \brief Calculates the size value of the largest type.
- */
-template <typename Type, typename... Types> struct union_size {
-  static size_t const head;
-  static size_t const tail;
-  static size_t const value;
-};
+template <typename... States> using StateStorage = std::variant<States...>;
 
-template <typename Type> struct union_size<Type> { static size_t const value; };
+template <typename StateStorage> class StateMachine {
+  StateStorage state_{};
 
-template <typename Type, typename... Types>
-size_t const union_size<Type, Types...>::head{sizeof(Type)};
-template <typename Type, typename... Types>
-size_t const union_size<Type, Types...>::tail{union_size<Types>::value...};
-template <typename Type, typename... Types>
-size_t const union_size<Type, Types...>::value{head > tail ? head : tail};
-
-template <typename Type> size_t const union_size<Type>::value{sizeof(Type)};
-
-/*!
- * \brief State machine that use the given types to represent different states.
- */
-template <typename BaseState, typename... States> class StateMachine {
-  uint8_t storage[union_size<States...>::value];
-
-  template <typename State, typename... Args> void SetState(Args &&... args) {
-    new (storage) State(std::forward<Args>(args)...);
+public:
+  template <typename Event> void send(const Event &event) {
+    state_ = std::visit(
+        [&event = event](auto &&state) { return state.receive(event); },
+        state_);
   }
-
-  BaseState *getBasePtr() { return reinterpret_cast<BaseState *>(storage); }
-
-  template <typename Event> void Send(const Event &event) {}
 };
 
-template <typename Sm, typename Event, typename... Events>
-struct StateBase : StateBase<Sm, Events...> {
-  virtual void Receive(const Event &, const Sm &) { this->UnhandledEvent(); }
-};
-
-template <typename Sm, typename Event> struct StateBase<Sm, Event> {
-  virtual void UnhandledEvent() = 0;
-  virtual void Receive(const Event &, const Sm &) { UnhandledEvent(); }
-  virtual ~StateBase();
+template <typename StateStorage> struct StateBase {
+  /*! \brief Default action must not trigger on a correctly defined state
+   * machine. */
+  template <typename Event> StateStorage Receive(const Event &) {
+    assert(false);
+  }
 };
 
 class ButtonNumber {};
@@ -79,15 +55,12 @@ class ButtonNext {};
 class RemoteState;
 class Idling;
 class Sending;
-using RemoteLogic = StateMachine<RemoteState, Idling, Sending>;
 
-struct RemoteState : StateBase<RemoteLogic, ButtonNumber, ButtonNext> {
-  void UnhandledEvent(){};
-};
+using RemoteStates = StateStorage<Idling, Sending>;
 
-class Idling : public RemoteState {};
-class Sending : public RemoteState {};
+class Idling : public StateBase<RemoteStates> {};
+class Sending : public StateBase<RemoteStates> {};
 
-RemoteLogic sm;
+StateMachine<RemoteStates> sm;
 
 #endif // STATEMACHINE_HPP
