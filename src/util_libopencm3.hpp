@@ -23,7 +23,7 @@ constexpr const uint32_t KILO = 1000;
 
 namespace util {
 
-#define assert(condition) ((!condition) ? (void)0 : std::abort())
+#define assert(condition) ((condition) ? (void)0 : std::abort())
 
 #ifndef TEST
 constexpr etl::pair<rcc_periph_clken, bool>

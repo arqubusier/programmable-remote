@@ -26,18 +26,38 @@ struct StateId {
   };
 };
 
-class ButtonNumber {};
-class ButtonNext {};
+struct ButtonNumber {};
+struct ButtonNext {};
+struct ButtonStop {};
+struct SendDone {};
+struct SendNext {};
+struct Timeout {};
 
-class RemoteState;
-class Idling;
-class Sending;
+struct RemoteState {};
+struct Idling {};
+struct Sending {};
+struct WaitingNextSend {};
+struct SelectingProgram {};
+struct Receiving {};
+struct WaitingReceiveQuiet {};
+struct NumberOfStates {};
 
-using RemoteStates = util::StateStorage<Idling, Sending>;
+using RemoteStates =
+    util::StateStorage<Idling, Sending, WaitingNextSend, SelectingProgram,
+                       Receiving, WaitingReceiveQuiet, NumberOfStates>;
 
-class Idling : public util::StateBase<RemoteStates> {};
-class Sending : public util::StateBase<RemoteStates> {};
+RemoteStates receive(Idling &, ButtonNumber const &) { return Sending{}; }
+RemoteStates receive(Idling &, ButtonNext const &) {
+  return SelectingProgram{};
+}
+RemoteStates receive(Sending &, ButtonNumber const &) {
+  return SelectingProgram{};
+}
 
-util::StateMachine<RemoteStates> sm;
+template <typename State, typename Event>
+RemoteStates receive(State &, Event const &) {
+  assert(false);
+  return Idling{};
+}
 
 #endif // STATEMACHINE_HPP

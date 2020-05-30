@@ -5,6 +5,7 @@
                           // in one cpp file
 #include "catch.hpp"
 #include "util.hpp"
+#include "util_libopencm3.hpp"
 
 TEST_CASE("ns2count") {
   uint32_t const period_ns = 5 * KILO;
@@ -25,6 +26,10 @@ TEST_CASE("ns2count") {
 }
 
 #include "statemachine.hpp"
+#include <utility>
+
 TEST_CASE("1 step transition") {
-  RemoteLogic sm;
+  util::StateMachine<RemoteStates> sm{};
+  sm.send(ButtonNumber{});
+  sm.send(Timeout{});
 }

@@ -12,20 +12,23 @@ template <typename StateStorage> class StateMachine {
   StateStorage state_{};
 
 public:
-  template <typename Event> void send(const Event &event) {
+  StateMachine() = default;
+  template <class T, class... Args>
+  constexpr explicit StateMachine(std::in_place_type_t<T>, Args &&... args)
+      : state_{std::forward<T>(args)...} {}
+
+  template <typename Event> void send(Event const &event) {
     state_ = std::visit(
-        [&event = event](auto &&state) { return state.receive(event); },
+        [&event = event](auto &&state) { return receive(state, event); },
         state_);
   }
 };
 
-template <typename StateStorage> struct StateBase {
-  /*! \brief Default action must not trigger on a correctly defined state
-   * machine. */
-  template <typename Event> StateStorage Receive(const Event &) {
-    assert(false);
-  }
-};
+template <typename StateStorage, typename State, typename Event>
+auto receive(State &, Event const &) -> StateStorage {
+  assert(false);
+}
+
 } // namespace util
 
 #endif // UTIL_HPP
