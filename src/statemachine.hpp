@@ -1,7 +1,9 @@
 #ifndef STATEMACHINE_HPP
 #define STATEMACHINE_HPP
 
+#include "common.hpp"
 #include "util.hpp"
+#include "util_libopencm3.hpp"
 
 struct EventId {
   enum {
@@ -26,38 +28,74 @@ struct StateId {
   };
 };
 
-struct ButtonNumber {};
-struct ButtonNext {};
-struct ButtonStop {};
-struct SendDone {};
-struct SendNext {};
-struct Timeout {};
+template <typename OutputHandlerT> struct RemoteStateTable {
 
-struct RemoteState {};
-struct Idling {};
-struct Sending {};
-struct WaitingNextSend {};
-struct SelectingProgram {};
-struct Receiving {};
-struct WaitingReceiveQuiet {};
-struct NumberOfStates {};
+  struct ButtonNumber {};
+  struct ButtonNext {};
+  struct ButtonStop {};
+  struct SendDone {};
+  struct SendNext {};
+  struct Timeout {};
 
-using RemoteStates =
-    util::StateStorage<Idling, Sending, WaitingNextSend, SelectingProgram,
-                       Receiving, WaitingReceiveQuiet, NumberOfStates>;
+  struct Idling {};
 
-RemoteStates receive(Idling &, ButtonNumber const &) { return Sending{}; }
-RemoteStates receive(Idling &, ButtonNext const &) {
-  return SelectingProgram{};
-}
-RemoteStates receive(Sending &, ButtonNumber const &) {
-  return SelectingProgram{};
-}
+  struct Sending {
+    uint32_t cmd_timer_freq = 2 * MEGA;
+    bool lock_;
+    util::Timer cmd_timer_;
+    util::Timer carrier_timer_;
+    OutputHandlerT handler_;
 
-template <typename State, typename Event>
-RemoteStates receive(State &, Event const &) {
-  assert(false);
-  return Idling{};
-}
+    Sending(Sending &&other) { std::swap(*this, other); };
+    Sending &operator=(Sending &&other) {
+      std::swap(*this, other);
+      return *this;
+    }
+
+    Sending(const Timings &cmd)
+        : lock_{false}, cmd_timer_{TIM3, TIM_OC1, 36,
+                                   util::ns2count(cmd_timer_freq, 24 * MEGA)},
+          carrier_timer_{TIM4, TIM_OC1, 36,
+                         util::ns2count(cmd_timer_freq, 24 * MEGA)},
+          handler_(lock_, cmd_timer_, carrier_timer_) {
+      handler_.send(cmd);
+    }
+  };
+  struct WaitingNextSend {};
+  struct SelectingProgram {};
+  struct Receiving {};
+  struct WaitingReceiveQuiet {};
+
+  struct RemoteTypes {
+    using OutputHandlerT_ = OutputHandlerT;
+  };
+
+  using StateStorage =
+      util::StateStorage<Idling, Sending, WaitingNextSend, SelectingProgram,
+                         Receiving, WaitingReceiveQuiet>;
+
+  static StateStorage receive(Idling &, ButtonNumber const &) {
+    Timings menu_cmd(67, {16197, 8671, 1234, 3147, 1249, 3127, 1258, 936,  1261,
+                          932,   1263, 928,  1256, 933,  1260, 931,  1256, 3119,
+                          1260,  3116, 1194, 1000, 1261, 3114, 1224, 970,  1248,
+                          3124,  1217, 979,  1261, 3113, 1262, 932,  1162, 1030,
+                          1260,  3113, 1252, 943,  1262, 3113, 1164, 3215, 1236,
+                          958,   1261, 954,  1228, 3122, 1217, 3161, 1261, 934,
+                          1269,  3105, 1241, 953,  1228, 965,  1257, 3119, 1260,
+                          3118,  1263, 929,  1262});
+    return Sending{menu_cmd};
+  }
+
+  static StateStorage receive(Idling &, ButtonNext const &) {
+    return SelectingProgram{};
+  }
+
+  template <typename State, typename Event>
+  static StateStorage receive(State &, Event const &) {
+    assert(false);
+    return Idling{};
+  }
+
+}; // RemoteStateTable
 
 #endif // STATEMACHINE_HPP

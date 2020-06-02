@@ -8,10 +8,10 @@
 namespace util {
 template <typename... States> using StateStorage = std::variant<States...>;
 
-template <typename StateStorage> class StateMachine {
-  StateStorage state_{};
-
+template <typename StateTable> class StateMachine {
 public:
+  typename StateTable::StateStorage state_{};
+
   StateMachine() = default;
   template <class T, class... Args>
   constexpr explicit StateMachine(std::in_place_type_t<T>, Args &&... args)
@@ -19,15 +19,19 @@ public:
 
   template <typename Event> void send(Event const &event) {
     state_ = std::visit(
-        [&event = event](auto &&state) { return receive(state, event); },
+        [&event = event](auto &&state) {
+          return StateTable::receive(state, event);
+        },
         state_);
   }
 };
 
+/*
 template <typename StateStorage, typename State, typename Event>
 auto receive(State &, Event const &) -> StateStorage {
   assert(false);
 }
+*/
 
 } // namespace util
 

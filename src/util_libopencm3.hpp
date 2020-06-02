@@ -25,6 +25,14 @@ namespace util {
 
 #define assert(condition) ((condition) ? (void)0 : std::abort())
 
+#ifdef TEST
+#define TIM1 0
+#define TIM2 0
+#define TIM3 0
+#define TIM4 0
+#define TIM_OC1 0
+#endif
+
 #ifndef TEST
 constexpr etl::pair<rcc_periph_clken, bool>
 GetTimerRccPeriphClken(uint32_t tim) {

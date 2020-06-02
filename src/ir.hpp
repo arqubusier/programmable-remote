@@ -5,19 +5,8 @@
 #include "etl/array.h"
 #include <libopencm3/stm32/timer.h>
 
+#include "common.hpp"
 #include "util_libopencm3.hpp"
-
-struct Timings {
-  static const uint16_t MAX_TIMING_LIMIT = 100;
-  using array_t = etl::array<uint16_t, MAX_TIMING_LIMIT>;
-
-  Timings(size_t size, array_t array) : size_{size}, array_{array} {}
-  Timings() = default;
-  Timings(const Timings &) = default;
-
-  size_t size_;
-  etl::array<uint16_t, MAX_TIMING_LIMIT> array_;
-};
 
 class PulseHandler {
 protected:
@@ -126,6 +115,7 @@ class OutputHandler final : public PulseHandler {
   util::Timer carrier_timer_;
 
 public:
+  OutputHandler &operator=(OutputHandler &&other) { return std::swap(*this, other); }
   OutputHandler(bool &lock, util::Timer const &cmd_timer,
                 util::Timer const &carrier_timer)
       : PulseHandler{lock}, cmd_timer_{cmd_timer}, carrier_timer_{
