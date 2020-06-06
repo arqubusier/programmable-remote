@@ -40,25 +40,33 @@ template <typename OutputHandlerT> struct RemoteStateTable {
   struct Idling {};
 
   struct Sending {
-    uint32_t cmd_timer_freq = 2 * MEGA;
+    uint32_t cmd_timer_freq_ = 2 * MEGA;
     bool lock_;
     util::Timer cmd_timer_;
     util::Timer carrier_timer_;
     OutputHandlerT handler_;
 
+    Sending(const Timings &cmd)
+        : lock_{false}, cmd_timer_{TIM3, TIM_OC1, 36,
+                                   util::ns2count(cmd_timer_freq_, 24 * MEGA)},
+          carrier_timer_{TIM4, TIM_OC1, 36,
+                         util::ns2count(cmd_timer_freq_, 24 * MEGA)},
+          handler_(lock_, cmd_timer_, carrier_timer_) {
+      handler_.send(cmd);
+    }
+
     Sending(Sending &&other) { std::swap(*this, other); };
     Sending &operator=(Sending &&other) {
-      std::swap(*this, other);
+      swap(other);
       return *this;
     }
 
-    Sending(const Timings &cmd)
-        : lock_{false}, cmd_timer_{TIM3, TIM_OC1, 36,
-                                   util::ns2count(cmd_timer_freq, 24 * MEGA)},
-          carrier_timer_{TIM4, TIM_OC1, 36,
-                         util::ns2count(cmd_timer_freq, 24 * MEGA)},
-          handler_(lock_, cmd_timer_, carrier_timer_) {
-      handler_.send(cmd);
+    void swap(Sending &other) {
+      cmd_timer_freq_ = other.cmd_timer_freq_;
+      lock_ = other.lock_;
+      cmd_timer_ = std::move(other.cmd_timer_);
+      carrier_timer_ = std::move(other.cmd_timer_);
+      handler_ = std::move(handler_);
     }
   };
   struct WaitingNextSend {};
@@ -95,7 +103,6 @@ template <typename OutputHandlerT> struct RemoteStateTable {
     assert(false);
     return Idling{};
   }
-
 }; // RemoteStateTable
 
 #endif // STATEMACHINE_HPP
