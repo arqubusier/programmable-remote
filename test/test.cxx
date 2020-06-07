@@ -17,22 +17,13 @@ struct OutputHandlerMock {
 
   // No easy way to mock send since it's called on an object created in
   // The constructor of Sending.
-  void send(Timings const &) { n_send_calls++; }
+  void send(Program const &) { n_send_calls++; }
 };
 
 uint32_t OutputHandlerMock::n_send_calls = 0;
 
 using STable = RemoteStateTable<OutputHandlerMock>;
 using StateMachineT = util::StateMachine<STable>;
-
-uint32_t g_receive_send_done = 0;
-// Need to put specialization in same namespace i.e. outside test.
-template <>
-template <>
-void StateMachineT::send<typename STable::SendDone>(
-    typename STable::SendDone const &) {
-  g_receive_send_done++;
-}
 
 namespace test {
 TEST(ns2count, even_periods) {
@@ -75,35 +66,36 @@ TEST(StateMachine, Idling) {
   // Invalid transitions
   util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{}};
   EXPECT_DEATH(sm.send(STable::Timeout{}), "");
-  EXPECT_DEATH(sm.send(STable::SendDone{}), "");
+  EXPECT_DEATH(sm.send(STable::SendNextSegment{}), "");
 }
 
 /*!
  * \brief Test Sending a single command.
  */
 TEST(StateMachine, SendingSingle) {
-  Timings fake_cmd(1, {1});
+  Program fake_cmd({1, {1, {1}}});
 
-  OutputHandlerMock::n_send_calls = 0;
   util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{},
                                 fake_cmd};
-  EXPECT_EQ(OutputHandlerMock::n_send_calls, 1);
 
-  // EXPECT call sm.send(Sending, SendDone{})
+  sm.send(STable::SendNextSegment{});
+  EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
 }
 
 /*!
  * \brief Test Sending a sequence of commands of length > 1.
  */
 TEST(StateMachine, SendingSequence) {
+  Command fake_cmd{1, {1}};
+  Program fake_prg{2, fake_cmd, fake_cmd};
   util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{}};
-  // sm.send(ButtonNumber{});
 
-  // expect call to inputhandler start
-  // expect call delay start
-  // expect call timeout
-  // expect call to inputhandler start
-  // expect SendDone -> Idling
+  sm.send(STable::SendNextSegment{});
+  EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
+  sm.send(STable::SendNextCommand{});
+  EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
+  sm.send(STable::SendNextSegment{});
+  EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
 }
 } // namespace test
 

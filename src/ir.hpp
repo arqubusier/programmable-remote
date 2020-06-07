@@ -115,7 +115,9 @@ class OutputHandler final : public PulseHandler {
   util::Timer carrier_timer_;
 
 public:
-  OutputHandler &operator=(OutputHandler &&other) { return std::swap(*this, other); }
+  OutputHandler &operator=(OutputHandler &&other) {
+    return std::swap(*this, other);
+  }
   OutputHandler(bool &lock, util::Timer const &cmd_timer,
                 util::Timer const &carrier_timer)
       : PulseHandler{lock}, cmd_timer_{cmd_timer}, carrier_timer_{
@@ -127,7 +129,7 @@ public:
    * active when the timer is enabled.
    */
   void send(const Timings &to_send) {
-    etl::copy(to_send.array_.begin(), to_send.array_.begin() + to_send.size_,
+    std::copy(to_send.array_.begin(), to_send.array_.begin() + to_send.size_,
               timings_.array_.begin());
     timings_.size_ = to_send.size_;
     // Prepare delta for first segment
