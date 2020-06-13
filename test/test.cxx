@@ -2,6 +2,9 @@
 #include "gtest/gtest.h"
 //#include "../googletest/googlemock/include/gmock/gmock.h"
 
+#define TESTING
+
+#include "ir.hpp"
 #include "statemachine.hpp"
 #include "util.hpp"
 #include "util_libopencm3.hpp"
@@ -22,7 +25,9 @@ struct OutputHandlerMock {
 
 uint32_t OutputHandlerMock::n_send_calls = 0;
 
-using STable = RemoteStateTable<OutputHandlerMock>;
+// using STable = RemoteStateTable<OutputHandlerMock>;
+struct MockTag {};
+using STable = RemoteStateTable<OutputHandler<MockTag>>;
 using StateMachineT = util::StateMachine<STable>;
 
 namespace test {
@@ -73,10 +78,9 @@ TEST(StateMachine, Idling) {
  * \brief Test Sending a single command.
  */
 TEST(StateMachine, SendingSingle) {
-  Program fake_cmd({1, {1, {1}}});
+  Program prg({1, {1, {1}}});
 
-  util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{},
-                                fake_cmd};
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{}, {prg}};
 
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
@@ -86,9 +90,9 @@ TEST(StateMachine, SendingSingle) {
  * \brief Test Sending a sequence of commands of length > 1.
  */
 TEST(StateMachine, SendingSequence) {
-  Command fake_cmd{1, {1}};
-  Program fake_prg{2, fake_cmd, fake_cmd};
-  util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{}};
+  Command cmd{1, {1}};
+  Program prg{2, cmd, cmd};
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{}, {prg}};
 
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));

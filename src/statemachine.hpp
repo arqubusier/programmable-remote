@@ -30,29 +30,48 @@ struct StateId {
 
 template <typename OutputHandlerT> struct RemoteStateTable {
 
-  struct ButtonNumber {};
-  struct ButtonNext {};
-  struct ButtonStop {};
-  struct SendNextSegment {};
-  struct SendNextCommand {};
-  struct Timeout {};
+  struct Common {
+    Program program_;
+  };
+  struct ButtonNumber : Common {
+    ButtonNumber(Common &&common) : Common(std::move(common)) {}
+  };
+  struct ButtonNext : Common {
+    ButtonNext(Common &&common) : Common(std::move(common)) {}
+  };
+  struct ButtonStop : Common {
+    ButtonStop(Common &&common) : Common(std::move(common)) {}
+  };
+  struct SendNextSegment : Common {
+    SendNextSegment(Common &&common) : Common(std::move(common)) {}
+  };
+  struct SendNextCommand : Common {
+    SendNextCommand(Common &&common) : Common(std::move(common)) {}
+  };
+  struct Timeout : Common {
+    Timeout(Common &&common) : Common(std::move(common)) {}
+  };
 
-  struct Idling {};
+  struct Idling : Common {
+    Idling(Common &&common) : Common(std::move(common)) {}
+  };
 
-  struct Sending {
+  struct Sending : Common {
     uint32_t cmd_timer_freq_ = 2 * MEGA;
     bool lock_;
     util::Timer cmd_timer_;
     util::Timer carrier_timer_;
     OutputHandlerT handler_;
+    size_t command_index;
 
-    Sending(const Program &cmd)
-        : lock_{false}, cmd_timer_{TIM3, TIM_OC1, 36,
-                                   util::ns2count(cmd_timer_freq_, 24 * MEGA)},
+    Sending(Common &&common)
+        : Common{std::move(common)}, lock_{false},
+          cmd_timer_{TIM3, TIM_OC1, 36,
+                     util::ns2count(cmd_timer_freq_, 24 * MEGA)},
           carrier_timer_{TIM4, TIM_OC1, 36,
                          util::ns2count(cmd_timer_freq_, 24 * MEGA)},
-          handler_(lock_, cmd_timer_, carrier_timer_) {
-      handler_.send(cmd);
+          handler_(lock_, cmd_timer_, carrier_timer_), command_index{0} {
+      handler_.send(this->program_.array_[0]);
     }
 
     Sending(Sending &&other) { swap(other); };
@@ -82,7 +101,7 @@ template <typename OutputHandlerT> struct RemoteStateTable {
       util::StateStorage<Idling, Sending, WaitingNextSend, SelectingProgram,
                          Receiving, WaitingReceiveQuiet>;
 
-  static StateStorage receive(Idling &, ButtonNumber const &) {
+  static StateStorage receive(Idling &state, ButtonNumber const &) {
     Program menu_cmd(
         {1, {67, {16197, 8671, 1234, 3147, 1249, 3127, 1258, 936,  1261, 932,
                   1263,  928,  1256, 933,  1260, 931,  1256, 3119, 1260, 3116,
@@ -91,17 +110,35 @@ template <typename OutputHandlerT> struct RemoteStateTable {
                   1262,  3113, 1164, 3215, 1236, 958,  1261, 954,  1228, 3122,
                   1217,  3161, 1261, 934,  1269, 3105, 1241, 953,  1228, 965,
                   1257,  3119, 1260, 3118, 1263, 929,  1262}}});
-    return Sending{menu_cmd};
+    return Sending{std::move(state)};
   }
 
-  static StateStorage receive(Idling &, ButtonNext const &) {
-    return SelectingProgram{};
+  static StateStorage receive(Idling &state, ButtonNext const &) {
+    return SelectingProgram{std::move(state)};
+  }
+
+  static StateStorage receive(Sending &state, SendNextSegment const &) {
+    switch (state.handler_.handle(state.handler_)) {
+    case OutputHandlerT::CONTINUE:
+      return state;
+    case OutputHandlerT::STOP:
+      state.command_index_++;
+      if (state.command_index_ < state.program_.size_) {
+        state.handler_.send(state.program_.array_[state.command_index_++]);
+        return state;
+      } else {
+        return Idling{std::move(state)};
+      }
+    case OutputHandlerT::ERROR:
+    default:
+      return Idling{std::move(state)};
+    }
   }
 
   template <typename State, typename Event>
-  static StateStorage receive(State &, Event const &) {
+  static StateStorage receive(State &state, Event const &) {
     assert(false);
-    return Idling{};
+    return Idling{std::move(state)};
   }
 }; // RemoteStateTable
 

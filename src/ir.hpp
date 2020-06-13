@@ -3,45 +3,50 @@
 #include <stdint.h>
 
 #include "etl/array.h"
-#include <libopencm3/stm32/timer.h>
+#include "stm32f1_hal.hpp"
 
 #include "common.hpp"
 #include "util_libopencm3.hpp"
 
-class PulseHandler {
+template <typename ImplementationTag> class PulseHandler {
 protected:
+  using Implementation = ImplementationTag;
   enum Result { CONTINUE, STOP, ERROR };
+  using ResultT = typename PulseHandler<ImplementationTag>::Result;
 
   bool &lock_;
   uint32_t state_;
-  Timings timings_;
+  Command command_;
 
 public:
-  PulseHandler(bool &lock) : lock_{lock}, state_{0}, timings_{} {}
+  PulseHandler(bool &lock) : lock_{lock}, state_{0}, command_{} {}
 
   template <typename HandlerImplementationT>
-  void handle(HandlerImplementationT &handler_implementation) {
-    if (state_ >= Timings::MAX_TIMING_LIMIT) {
-      state_ = 0;
+  ResultT handle(HandlerImplementationT &handler_implementation) {
+    if (this->state_ >= Command::SECTION_LIMIT) {
+      this->state_ = 0;
       handler_implementation.reset();
-      fail();
+      this->fail();
     }
 
-    switch (handler_implementation.handle_sub(state_)) {
+    ResultT res = handler_implementation.handle_sub(this->state_);
+    switch (res) {
     case CONTINUE:
-      state_++;
+      this->state_++;
       break;
-    case STOP:
-      state_ = 0;
+    case ResultT::STOP:
+      this->state_ = 0;
       handler_implementation.reset();
       break;
-    case ERROR:
+    case ResultT::ERROR:
     default:
-      state_ = 0;
+      this->state_ = 0;
       handler_implementation.reset();
-      fail();
+      this->fail();
       break;
     }
+
+    return res;
   }
 
 protected:
@@ -51,66 +56,79 @@ private:
   void fail() {}
 };
 
-class InputHandler final : public PulseHandler {
+template <typename Implementation>
+class InputHandler final : public PulseHandler<Implementation> {
   bool timeout() { return true; }
   util::Timer const &timer_;
+  using ResultT = typename PulseHandler<Implementation>::Result;
 
 public:
   InputHandler(bool &lock, util::Timer const &timer)
-      : PulseHandler{lock}, timer_{timer} {}
+      : PulseHandler<Implementation>{lock}, timer_{timer} {}
 
-  Result handle_sub(uint32_t state) {
-    Result result = ERROR;
-    uint32_t delta = timer_get_counter(timer_.tim_);
-    timer_set_counter(timer_.tim_, 0);
+  ResultT handle_sub(uint32_t state) {
+    ResultT result = ResultT::ERROR;
+    uint32_t delta =
+        hal::timer_get_counter(Implementation{}, this->timer_.tim_);
+    NOT_IN_TEST(timer_set_counter(this->timer_.tim_, 0));
 
     if (state == 0) {
-      timer_enable_counter(timer_.tim_);
-      timings_.size_ = 0;
+      NOT_IN_TEST(timer_enable_counter(this->timer_.tim_));
+      this->command_.size_ = 0;
     } else {
-      timings_.array_[timings_.size_] = delta;
-      timings_.size_++;
-      timer_clear_flag(timer_.tim_, TIM_SR_UIF);
+      this->command_.array_[this->command_.size_] = delta;
+      this->command_.size_++;
+      NOT_IN_TEST(timer_clear_flag(this->timer_.tim_, TIM_SR_UIF));
     }
-    result = CONTINUE;
+    result = ResultT::CONTINUE;
 
     return result;
   }
 
   void stop() {
-    if (timer_get_flag(timer_.tim_, TIM_SR_UIF)) {
-      timer_clear_flag(timer_.tim_, TIM_SR_UIF);
+#ifndef TEST
+    if (timer_get_flag(this->timer_.tim_, TIM_SR_UIF)) {
+      timer_clear_flag(this->timer_.tim_, TIM_SR_UIF);
       if (state_ > 1) {
-        state_ = 0;
-        reset();
+        this->state_ = 0;
+        this->reset();
       }
     }
+#endif
   }
 
   void reset() {
-    nvic_disable_irq(util::GetTimerIrqn(timer_.tim_).first);
-    timer_disable_counter(timer_.tim_);
-    timer_set_counter(timer_.tim_, 0);
+#ifndef TESTING
+    nvic_disable_irq(util::GetTimerIrqn(this->timer_.tim_).first);
+    timer_disable_counter(this->timer_.tim_);
+    timer_set_counter(this->timer_.tim_, 0);
+#endif
   }
 
   void setup(void) {
-    rcc_periph_clock_enable(util::GetTimerRccPeriphClken(timer_.tim_).first);
+#ifndef TESTING
+    rcc_periph_clock_enable(
+        util::GetTimerRccPeriphClken(this->timer_.tim_).first);
 
     // Reset timer peripheral to defaults.
-    rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(timer_.tim_).first);
+    rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(this->timer_.tim_).first);
 
-    timer_set_mode(timer_.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
+    timer_set_mode(this->timer_.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                    TIM_CR1_DIR_UP);
-    timer_set_prescaler(timer_.tim_, timer_.prescaler_);
-    timer_continuous_mode(timer_.tim_);
-    timer_set_period(timer_.tim_, timer_.period_);
+    timer_set_prescaler(this->timer_.tim_, timer_.prescaler_);
+    timer_continuous_mode(this->timer_.tim_);
+    timer_set_period(this->timer_.tim_, this->timer_.period_);
 
-    timer_enable_irq(timer_.tim_, TIM_DIER_UIE);
-    nvic_enable_irq(util::GetTimerIrqn(timer_.tim_).first);
+    timer_enable_irq(this->timer_.tim_, TIM_DIER_UIE);
+    nvic_enable_irq(util::GetTimerIrqn(this->timer_.tim_).first);
+#endif
   }
 };
 
-class OutputHandler final : public PulseHandler {
+template <typename Implementation>
+class OutputHandler final : public PulseHandler<Implementation> {
+  using ResultT = typename PulseHandler<Implementation>::Result;
+
   util::Timer cmd_timer_;
   util::Timer carrier_timer_;
 
@@ -120,55 +138,62 @@ public:
   }
   OutputHandler(bool &lock, util::Timer const &cmd_timer,
                 util::Timer const &carrier_timer)
-      : PulseHandler{lock}, cmd_timer_{cmd_timer}, carrier_timer_{
-                                                       carrier_timer} {}
+      : PulseHandler<Implementation>{lock}, cmd_timer_{cmd_timer},
+        carrier_timer_{carrier_timer} {}
 
   /*! \brief   Start send command.
    *  \details Enables timer with the first timeout value. Enables carrier timer
    * and turns on its output. ARR is set with the first timeout, which will be
    * active when the timer is enabled.
    */
-  void send(const Timings &to_send) {
+  void send(const Command &to_send) {
     std::copy(to_send.array_.begin(), to_send.array_.begin() + to_send.size_,
-              timings_.array_.begin());
-    timings_.size_ = to_send.size_;
-    // Prepare delta for first segment
-    timer_set_period(cmd_timer_.tim_, timings_.array_[0]);
-    timer_enable_counter(cmd_timer_.tim_);
-    timer_enable_counter(carrier_timer_.tim_);
-    timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
+              this->command_.array_.begin());
+    this->command_.size_ = to_send.size_;
+// Prepare delta for first segment
+#ifndef TESTING
+    timer_set_period(this->cmd_timer_.tim_, this->command_.array_[0]);
+    timer_enable_counter(this->cmd_timer_.tim_);
+    timer_enable_counter(this->carrier_timer_.tim_);
+    timer_enable_oc_output(this->carrier_timer_.tim_,
+                           this->carrier_timer_.channel_);
+#endif
   }
 
   /*! \brief   next send command.
    *  \details ARR is set with the first timeout, which will be active when the
    *           timer is enabled.
    */
-  Result handle_sub(uint32_t state) {
-    Result result = ERROR;
+  ResultT handle_sub(uint32_t state) {
+    ResultT result = ResultT::ERROR;
 
     // Interrupt fires immediately when timer is enabled, therefore
     // We effectively start with state_ == 1
-    if (timer_get_flag(cmd_timer_.tim_, TIM_SR_UIF)) {
-      timer_clear_flag(cmd_timer_.tim_, TIM_SR_UIF);
+    if (hal::timer_get_flag(Implementation{}, this->cmd_timer_.tim_,
+                            TIM_SR_UIF)) {
+      NOT_IN_TEST(timer_clear_flag(this->cmd_timer_.tim_, TIM_SR_UIF));
 
-      result = STOP;
-      if ((state % 2) == 1) {
+      result = ResultT::STOP;
+      if ((this->state % 2) == 1) {
         // next segment is carrier pulse
-        timer_enable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-        if (state + 1 < timings_.size_) {
-          result = CONTINUE;
+        NOT_IN_TEST(timer_enable_oc_output(this->carrier_timer_.tim_,
+                                           this->carrier_timer_.channel_));
+        if (this->state + 1 < this->command_.size_) {
+          result = ResultT::CONTINUE;
         }
       } else {
         // next segment is space
-        timer_disable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-        if (state + 1 < timings_.size_ - 1) {
-          result = CONTINUE;
+        NOT_IN_TEST(timer_disable_oc_output(this->carrier_timer_.tim_,
+                                            this->carrier_timer_.channel_));
+        if (this->state + 1 < this->command_.size_ - 1) {
+          result = ResultT::CONTINUE;
         }
       }
 
       // Prepare delta for coming segment
-      if (state + 1 < timings_.size_) {
-        timer_set_period(cmd_timer_.tim_, timings_.array_[state + 1]);
+      if (this->state + 1 < this->command_.size_) {
+        NOT_IN_TEST(timer_set_period(this->cmd_timer_.tim_,
+                                     this->command_.array_[this->state + 1]));
       }
     }
 
@@ -176,10 +201,11 @@ public:
   }
 
   void reset() {
-    timer_disable_counter(cmd_timer_.tim_);
-    timer_disable_counter(carrier_timer_.tim_);
-    timer_disable_oc_output(carrier_timer_.tim_, carrier_timer_.channel_);
-    timer_set_counter(cmd_timer_.tim_, 0);
+    NOT_IN_TEST(timer_disable_counter(this->cmd_timer_.tim_));
+    NOT_IN_TEST(timer_disable_counter(this->carrier_timer_.tim_));
+    NOT_IN_TEST(timer_disable_oc_output(this->carrier_timer_.tim_,
+                                        this->carrier_timer_.channel_));
+    hal::timer_set_counter(Implementation{}, this->cmd_timer_.tim_, 0);
   }
 
   void setup(void) {
@@ -189,43 +215,49 @@ public:
 
 private:
   void setup_cmd_timer() {
+#ifndef TEST
     rcc_periph_clock_enable(
-        util::GetTimerRccPeriphClken(cmd_timer_.tim_).first);
+        util::GetTimerRccPeriphClken(this->cmd_timer_.tim_).first);
 
     // Reset timer peripheral to defaults.
-    rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(cmd_timer_.tim_).first);
+    rcc_periph_reset_pulse(
+        util::GetTimerRccPeriphRst(this->cmd_timer_.tim_).first);
 
-    timer_set_mode(cmd_timer_.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
+    timer_set_mode(this->cmd_timer_.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                    TIM_CR1_DIR_UP);
-    timer_set_prescaler(cmd_timer_.tim_, cmd_timer_.prescaler_);
-    timer_continuous_mode(cmd_timer_.tim_);
-    timer_set_period(cmd_timer_.tim_, cmd_timer_.period_);
+    timer_set_prescaler(this->cmd_timer_.tim_, this->cmd_timer_.prescaler_);
+    timer_continuous_mode(this->cmd_timer_.tim_);
+    timer_set_period(this->cmd_timer_.tim_, this->cmd_timer_.period_);
 
     // TODO enable preload
-    timer_enable_irq(cmd_timer_.tim_, TIM_DIER_UIE);
-    nvic_enable_irq(util::GetTimerIrqn(cmd_timer_.tim_).first);
+    timer_enable_irq(this->cmd_timer_.tim_, TIM_DIER_UIE);
+    nvic_enable_irq(util::GetTimerIrqn(this->cmd_timer_.tim_).first);
+#endif
   }
 
   void setup_carrier_timer() {
+#ifndef TESTING
     rcc_periph_clock_enable(
-        util::GetTimerRccPeriphClken(carrier_timer_.tim_).first);
+        util::GetTimerRccPeriphClken(this->carrier_timer_.tim_).first);
     rcc_periph_reset_pulse(
-        util::GetTimerRccPeriphRst(carrier_timer_.tim_).first);
+        util::GetTimerRccPeriphRst(this->carrier_timer_.tim_).first);
 
-    timer_set_mode(carrier_timer_.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
-                   TIM_CR1_DIR_UP);
+    timer_set_mode(this->carrier_timer_.tim_, TIM_CR1_CKD_CK_INT,
+                   TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 
-    timer_set_prescaler(carrier_timer_.tim_, carrier_timer_.prescaler_);
-    timer_continuous_mode(carrier_timer_.tim_);
+    timer_set_prescaler(this->carrier_timer_.tim_,
+                        this->carrier_timer_.prescaler_);
+    timer_continuous_mode(this->carrier_timer_.tim_);
 
-    timer_set_period(carrier_timer_.tim_, carrier_timer_.period_);
+    timer_set_period(this->carrier_timer_.tim_, this->carrier_timer_.period_);
 
-    timer_set_oc_value(carrier_timer_.tim_, carrier_timer_.channel_,
-                       carrier_timer_.period_);
-    timer_set_oc_mode(carrier_timer_.tim_, carrier_timer_.channel_,
+    timer_set_oc_value(this->carrier_timer_.tim_, this->carrier_timer_.channel_,
+                       this->carrier_timer_.period_);
+    timer_set_oc_mode(this->carrier_timer_.tim_, this->carrier_timer_.channel_,
                       TIM_OCM_TOGGLE);
 
-    // interrupts and DMA requests are disabled by default.
+// interrupts and DMA requests are disabled by default.
+#endif
   }
 };
 #endif // IR_HPP
