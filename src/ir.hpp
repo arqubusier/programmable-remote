@@ -11,14 +11,15 @@
 template <typename ImplementationTag> class PulseHandler {
 protected:
   using Implementation = ImplementationTag;
-  enum Result { CONTINUE, STOP, ERROR };
-  using ResultT = typename PulseHandler<ImplementationTag>::Result;
 
   bool &lock_;
   uint32_t state_;
   Command command_;
 
 public:
+  enum Result { CONTINUE, STOP, ERROR };
+  using ResultT = typename PulseHandler<ImplementationTag>::Result;
+
   PulseHandler(bool &lock) : lock_{lock}, state_{0}, command_{} {}
 
   template <typename HandlerImplementationT>
@@ -60,9 +61,10 @@ template <typename Implementation>
 class InputHandler final : public PulseHandler<Implementation> {
   bool timeout() { return true; }
   util::Timer const &timer_;
-  using ResultT = typename PulseHandler<Implementation>::Result;
 
 public:
+  using ResultT = typename PulseHandler<Implementation>::Result;
+
   InputHandler(bool &lock, util::Timer const &timer)
       : PulseHandler<Implementation>{lock}, timer_{timer} {}
 
@@ -127,19 +129,23 @@ public:
 
 template <typename Implementation>
 class OutputHandler final : public PulseHandler<Implementation> {
-  using ResultT = typename PulseHandler<Implementation>::Result;
 
   util::Timer cmd_timer_;
   util::Timer carrier_timer_;
 
 public:
+  using ResultT = typename PulseHandler<Implementation>::Result;
   OutputHandler &operator=(OutputHandler &&other) {
-    return std::swap(*this, other);
+    swap(other);
+    return *this;
   }
+
   OutputHandler(bool &lock, util::Timer const &cmd_timer,
                 util::Timer const &carrier_timer)
       : PulseHandler<Implementation>{lock}, cmd_timer_{cmd_timer},
         carrier_timer_{carrier_timer} {}
+
+  void swap(other &) { this->lock = other.lock; }
 
   /*! \brief   Start send command.
    *  \details Enables timer with the first timeout value. Enables carrier timer
@@ -174,26 +180,26 @@ public:
       NOT_IN_TEST(timer_clear_flag(this->cmd_timer_.tim_, TIM_SR_UIF));
 
       result = ResultT::STOP;
-      if ((this->state % 2) == 1) {
+      if ((this->state_ % 2) == 1) {
         // next segment is carrier pulse
         NOT_IN_TEST(timer_enable_oc_output(this->carrier_timer_.tim_,
                                            this->carrier_timer_.channel_));
-        if (this->state + 1 < this->command_.size_) {
+        if (this->state_ + 1 < this->command_.size_) {
           result = ResultT::CONTINUE;
         }
       } else {
         // next segment is space
         NOT_IN_TEST(timer_disable_oc_output(this->carrier_timer_.tim_,
                                             this->carrier_timer_.channel_));
-        if (this->state + 1 < this->command_.size_ - 1) {
+        if (this->state_ + 1 < this->command_.size_ - 1) {
           result = ResultT::CONTINUE;
         }
       }
 
       // Prepare delta for coming segment
-      if (this->state + 1 < this->command_.size_) {
+      if (this->state_ + 1 < this->command_.size_) {
         NOT_IN_TEST(timer_set_period(this->cmd_timer_.tim_,
-                                     this->command_.array_[this->state + 1]));
+                                     this->command_.array_[this->state_ + 1]));
       }
     }
 

@@ -14,8 +14,8 @@ public:
 
   StateMachine() = default;
   template <class T, class... Args>
-  constexpr explicit StateMachine(std::in_place_type_t<T>, Args &&... args)
-      : state_{std::forward<T>(args)...} {}
+  constexpr StateMachine(std::in_place_type_t<T> tag, Args &&... args)
+      : state_{tag, std::forward<Args>(args)...} {}
 
   template <typename Event> void send(Event const &event) {
     state_ = std::visit(

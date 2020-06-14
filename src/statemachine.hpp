@@ -30,49 +30,44 @@ struct StateId {
 
 template <typename OutputHandlerT> struct RemoteStateTable {
 
-  struct Common {
+  // Events
+  struct ButtonNumber {};
+  struct ButtonNext {};
+
+  struct ButtonStop {};
+
+  struct SendNextSegment {};
+  struct SendNextCommand {};
+  struct Timeout {};
+
+  struct CommonState {
     Program program_;
   };
-  struct ButtonNumber : Common {
-    ButtonNumber(Common &&common) : Common(std::move(common)) {}
-  };
-  struct ButtonNext : Common {
-    ButtonNext(Common &&common) : Common(std::move(common)) {}
-  };
-  struct ButtonStop : Common {
-    ButtonStop(Common &&common) : Common(std::move(common)) {}
-  };
-  struct SendNextSegment : Common {
-    SendNextSegment(Common &&common) : Common(std::move(common)) {}
-  };
-  struct SendNextCommand : Common {
-    SendNextCommand(Common &&common) : Common(std::move(common)) {}
-  };
-  struct Timeout : Common {
-    Timeout(Common &&common) : Common(std::move(common)) {}
+
+  // States
+  struct Idling : CommonState {
+    Idling() = default;
+    Idling(CommonState &&common) : CommonState(std::move(common)) {}
   };
 
-  struct Idling : Common {
-    Idling(Common &&common) : Common(std::move(common)) {}
-  };
-
-  struct Sending : Common {
+  struct Sending : CommonState {
     uint32_t cmd_timer_freq_ = 2 * MEGA;
     bool lock_;
     util::Timer cmd_timer_;
     util::Timer carrier_timer_;
     OutputHandlerT handler_;
-    size_t command_index;
+    size_t command_index_;
 
-    Sending(Common &&common)
-        : Common{std::move(common)}, lock_{false},
+    Sending(CommonState &&common)
+        : CommonState{std::move(common)}, lock_{false},
           cmd_timer_{TIM3, TIM_OC1, 36,
                      util::ns2count(cmd_timer_freq_, 24 * MEGA)},
           carrier_timer_{TIM4, TIM_OC1, 36,
                          util::ns2count(cmd_timer_freq_, 24 * MEGA)},
-          handler_(lock_, cmd_timer_, carrier_timer_), command_index{0} {
+          handler_(lock_, cmd_timer_, carrier_timer_), command_index_{0} {
       handler_.send(this->program_.array_[0]);
     }
+    Sending() : Sending(CommonState{}) {}
 
     Sending(Sending &&other) { swap(other); };
     Sending &operator=(Sending &&other) {
@@ -88,19 +83,34 @@ template <typename OutputHandlerT> struct RemoteStateTable {
       handler_ = std::move(handler_);
     }
   };
-  struct WaitingNextSend {};
-  struct SelectingProgram {};
-  struct Receiving {};
-  struct WaitingReceiveQuiet {};
+  struct SelectingProgram : CommonState {
+    SelectingProgram() = default;
+    SelectingProgram(CommonState &&common) : CommonState{std::move(common)} {}
+  };
+  struct WaitingNextSend : CommonState {
+    WaitingNextSend() = default;
+    WaitingNextSend(CommonState &&common) : CommonState{std::move(common)} {}
+  };
+  struct Receiving : CommonState {
+    Receiving() = default;
+    Receiving(CommonState &&common) : CommonState{std::move(common)} {}
+  };
+  struct WaitingReceiveQuiet : CommonState {
+    WaitingReceiveQuiet() = default;
+    WaitingReceiveQuiet(CommonState &&common)
+        : CommonState{std::move(common)} {}
+  };
 
   struct RemoteTypes {
     using OutputHandlerT_ = OutputHandlerT;
   };
 
+  //  using StateStorage = util::StateStorage<Idling, Sending>;
   using StateStorage =
       util::StateStorage<Idling, Sending, WaitingNextSend, SelectingProgram,
                          Receiving, WaitingReceiveQuiet>;
 
+  // Handlers
   static StateStorage receive(Idling &state, ButtonNumber const &) {
     Program menu_cmd(
         {1, {67, {16197, 8671, 1234, 3147, 1249, 3127, 1258, 936,  1261, 932,
@@ -120,12 +130,12 @@ template <typename OutputHandlerT> struct RemoteStateTable {
   static StateStorage receive(Sending &state, SendNextSegment const &) {
     switch (state.handler_.handle(state.handler_)) {
     case OutputHandlerT::CONTINUE:
-      return state;
+      return Sending{std::move(state)};
     case OutputHandlerT::STOP:
       state.command_index_++;
       if (state.command_index_ < state.program_.size_) {
         state.handler_.send(state.program_.array_[state.command_index_++]);
-        return state;
+        return Sending{std::move(state)};
       } else {
         return Idling{std::move(state)};
       }

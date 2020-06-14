@@ -4,6 +4,13 @@
 
 #define TESTING
 
+namespace hal {
+struct MockTag {};
+uint32_t timer_get_counter(MockTag, uint32_t tim) { return 0; }
+uint32_t timer_get_flag(MockTag, uint32_t tim, uint32_t flag) { return 0; }
+void timer_set_counter(MockTag, uint32_t tim, uint32_t count) {}
+} // namespace hal
+
 #include "ir.hpp"
 #include "statemachine.hpp"
 #include "util.hpp"
@@ -26,8 +33,7 @@ struct OutputHandlerMock {
 uint32_t OutputHandlerMock::n_send_calls = 0;
 
 // using STable = RemoteStateTable<OutputHandlerMock>;
-struct MockTag {};
-using STable = RemoteStateTable<OutputHandler<MockTag>>;
+using STable = RemoteStateTable<OutputHandler<hal::MockTag>>;
 using StateMachineT = util::StateMachine<STable>;
 
 namespace test {
@@ -80,7 +86,9 @@ TEST(StateMachine, Idling) {
 TEST(StateMachine, SendingSingle) {
   Program prg({1, {1, {1}}});
 
-  util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{}, {prg}};
+  // util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{},
+  // {prg}};
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{}};
 
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
@@ -92,7 +100,9 @@ TEST(StateMachine, SendingSingle) {
 TEST(StateMachine, SendingSequence) {
   Command cmd{1, {1}};
   Program prg{2, cmd, cmd};
-  util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{}, {prg}};
+  //  util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{},
+  //  {prg}};
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{}};
 
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
