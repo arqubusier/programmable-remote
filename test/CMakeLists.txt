@@ -1,3 +1,4 @@
+set(CMAKE_EXPORT_COMPLIE_COMMANDS ON)
 add_executable(test test.cxx)
 target_include_directories(test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 target_include_directories(test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../etl/include")

@@ -3,7 +3,6 @@
 //#include "../googletest/googlemock/include/gmock/gmock.h"
 
 #define TESTING
-
 namespace hal {
 struct MockTag {};
 uint32_t timer_get_counter(MockTag, uint32_t tim) { return 0; }
@@ -71,7 +70,7 @@ TEST(StateMachine, Idling) {
   {
     util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{}};
     sm.send(STable::ButtonNext{});
-    EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
+    EXPECT_TRUE(std::holds_alternative<STable::SelectingProgram>(sm.state_));
   }
 
   // Invalid transitions
@@ -86,8 +85,6 @@ TEST(StateMachine, Idling) {
 TEST(StateMachine, SendingSingle) {
   Program prg({1, {1, {1}}});
 
-  // util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{},
-  // {prg}};
   util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{}};
 
   sm.send(STable::SendNextSegment{});
@@ -100,9 +97,8 @@ TEST(StateMachine, SendingSingle) {
 TEST(StateMachine, SendingSequence) {
   Command cmd{1, {1}};
   Program prg{2, cmd, cmd};
-  //  util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{},
-  //  {prg}};
-  util::StateMachine<STable> sm{std::in_place_type_t<STable::Idling>{}};
+
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{}};
 
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));

@@ -12,7 +12,6 @@ template <typename ImplementationTag> class PulseHandler {
 protected:
   using Implementation = ImplementationTag;
 
-  bool &lock_;
   uint32_t state_;
   Command command_;
 
@@ -20,7 +19,9 @@ public:
   enum Result { CONTINUE, STOP, ERROR };
   using ResultT = typename PulseHandler<ImplementationTag>::Result;
 
-  PulseHandler(bool &lock) : lock_{lock}, state_{0}, command_{} {}
+  PulseHandler() : state_{0}, command_{} {}
+  PulseHandler(PulseHandler &&other) = default;
+  PulseHandler &operator=(PulseHandler &&other) = default;
 
   template <typename HandlerImplementationT>
   ResultT handle(HandlerImplementationT &handler_implementation) {
@@ -60,13 +61,16 @@ private:
 template <typename Implementation>
 class InputHandler final : public PulseHandler<Implementation> {
   bool timeout() { return true; }
-  util::Timer const &timer_;
+  util::Timer timer_;
 
 public:
   using ResultT = typename PulseHandler<Implementation>::Result;
 
-  InputHandler(bool &lock, util::Timer const &timer)
-      : PulseHandler<Implementation>{lock}, timer_{timer} {}
+  InputHandler(util::Timer const &timer)
+      : PulseHandler<Implementation>{}, timer_{timer} {}
+
+  InputHandler(InputHandler &&other) = default;
+  InputHandler &operator=(InputHandler &&other) = default;
 
   ResultT handle_sub(uint32_t state) {
     ResultT result = ResultT::ERROR;
@@ -135,17 +139,13 @@ class OutputHandler final : public PulseHandler<Implementation> {
 
 public:
   using ResultT = typename PulseHandler<Implementation>::Result;
-  OutputHandler &operator=(OutputHandler &&other) {
-    swap(other);
-    return *this;
-  }
 
-  OutputHandler(bool &lock, util::Timer const &cmd_timer,
-                util::Timer const &carrier_timer)
-      : PulseHandler<Implementation>{lock}, cmd_timer_{cmd_timer},
+  OutputHandler(OutputHandler &&other) = default;
+  OutputHandler &operator=(OutputHandler &&other) = default;
+
+  OutputHandler(util::Timer const &cmd_timer, util::Timer const &carrier_timer)
+      : PulseHandler<Implementation>{}, cmd_timer_{cmd_timer},
         carrier_timer_{carrier_timer} {}
-
-  void swap(other &) { this->lock = other.lock; }
 
   /*! \brief   Start send command.
    *  \details Enables timer with the first timeout value. Enables carrier timer
