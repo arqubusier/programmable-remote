@@ -4,6 +4,7 @@
 #include "common.hpp"
 #include "util.hpp"
 #include "util_libopencm3.hpp"
+#include <exception>
 
 struct EventId {
   enum {
@@ -31,7 +32,7 @@ struct StateId {
 template <typename OutputHandlerT> struct RemoteStateTable {
 
   // Events
-  struct ButtonNumber {};
+  using ButtonNumber = uint32_t;
   struct ButtonNext {};
 
   struct ButtonStop {};
@@ -41,7 +42,7 @@ template <typename OutputHandlerT> struct RemoteStateTable {
   struct Timeout {};
 
   struct CommonState {
-    Program program_;
+    Programs programs_;
   };
 
   // States
@@ -58,17 +59,20 @@ template <typename OutputHandlerT> struct RemoteStateTable {
     util::Timer carrier_timer_;
     OutputHandlerT handler_;
     size_t command_index_;
+    size_t program_index_;
 
-    Sending() : Sending(CommonState{}) {}
+    // Sending() : Sending(CommonState{}, 0) {}
+    Sending() = delete; // Sending(CommonState{}, 0) {}
     Sending(Sending &&other) = default;
-    Sending(CommonState &&common)
+    Sending(CommonState &&common, ButtonNumber const &program_index)
         : CommonState{std::move(common)},
           cmd_timer_{TIM3, TIM_OC1, 36,
                      util::ns2count(cmd_timer_freq_, 24 * MEGA)},
           carrier_timer_{TIM4, TIM_OC1, 36,
                          util::ns2count(cmd_timer_freq_, 24 * MEGA)},
-          handler_(cmd_timer_, carrier_timer_), command_index_{0} {
-      handler_.send(this->program_.array_[0]);
+          handler_(cmd_timer_, carrier_timer_), command_index_{0},
+          program_index_{program_index} {
+      handler_.send(this->get_program().array_[0]);
     }
 
     Sending &operator=(Sending &&other) = default;
@@ -79,6 +83,8 @@ template <typename OutputHandlerT> struct RemoteStateTable {
       carrier_timer_ = std::move(other.cmd_timer_);
       handler_ = std::move(handler_);
     }
+
+    Program &get_program() { return this->programs_[this->program_index_]; }
   };
 
   struct SelectingProgram : CommonState {
@@ -117,16 +123,8 @@ template <typename OutputHandlerT> struct RemoteStateTable {
                          Receiving, WaitingReceiveQuiet>;
 
   // Handlers
-  static StateStorage receive(Idling &state, ButtonNumber const &) {
-    Program menu_cmd(
-        {1, {67, {16197, 8671, 1234, 3147, 1249, 3127, 1258, 936,  1261, 932,
-                  1263,  928,  1256, 933,  1260, 931,  1256, 3119, 1260, 3116,
-                  1194,  1000, 1261, 3114, 1224, 970,  1248, 3124, 1217, 979,
-                  1261,  3113, 1262, 932,  1162, 1030, 1260, 3113, 1252, 943,
-                  1262,  3113, 1164, 3215, 1236, 958,  1261, 954,  1228, 3122,
-                  1217,  3161, 1261, 934,  1269, 3105, 1241, 953,  1228, 965,
-                  1257,  3119, 1260, 3118, 1263, 929,  1262}}});
-    return Sending{std::move(state)};
+  static StateStorage receive(Idling &state, ButtonNumber const &program) {
+    return Sending{std::move(state), program};
   }
 
   static StateStorage receive(Idling &state, ButtonNext const &) {
@@ -134,13 +132,14 @@ template <typename OutputHandlerT> struct RemoteStateTable {
   }
 
   static StateStorage receive(Sending &state, SendNextSegment const &) {
+    Program &program{state.get_program()};
     switch (state.handler_.handle(state.handler_)) {
     case OutputHandlerT::CONTINUE:
       return Sending{std::move(state)};
     case OutputHandlerT::STOP:
       state.command_index_++;
-      if (state.command_index_ < state.program_.size_) {
-        state.handler_.send(state.program_.array_[state.command_index_++]);
+      if (state.command_index_ < program.size_) {
+        state.handler_.send(program.array_[state.command_index_++]);
         return Sending{std::move(state)};
       } else {
         return Idling{std::move(state)};
@@ -151,9 +150,14 @@ template <typename OutputHandlerT> struct RemoteStateTable {
     }
   }
 
+  static StateStorage receive(Sending &state, SendNextCommand const &) {
+    state.handler_.send(state.get_program().array_[state.command_index_]);
+    return Sending(std::move(state));
+  }
+
   template <typename State, typename Event>
   static StateStorage receive(State &state, Event const &) {
-    assert(false);
+    std::terminate();
     return Idling{std::move(state)};
   }
 }; // RemoteStateTable

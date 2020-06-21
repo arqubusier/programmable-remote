@@ -5,3 +5,4 @@ target_include_directories(test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../etl/incl
 target_include_directories(test PRIVATE "${GOOGLETEST_DIR}/googlemock/include")
 target_link_libraries(test gmock_main)
 target_link_libraries(test gtest_main)
+target_link_options(test PRIVATE -rdynamic)

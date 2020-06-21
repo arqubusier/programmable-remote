@@ -175,8 +175,10 @@ public:
 
     // Interrupt fires immediately when timer is enabled, therefore
     // We effectively start with state_ == 1
-    if (hal::timer_get_flag(Implementation{}, this->cmd_timer_.tim_,
-                            TIM_SR_UIF)) {
+    if (this->state_ == 0) {
+      result = ResultT::CONTINUE;
+    } else if (hal::timer_get_flag(Implementation{}, this->cmd_timer_.tim_,
+                                   TIM_SR_UIF)) {
       NOT_IN_TEST(timer_clear_flag(this->cmd_timer_.tim_, TIM_SR_UIF));
 
       result = ResultT::STOP;

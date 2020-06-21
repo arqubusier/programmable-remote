@@ -13,8 +13,6 @@ constexpr const uint32_t KILO = 1000;
 
 namespace util {
 
-#define assert(condition) ((condition) ? (void)0 : std::abort())
-
 #ifdef TEST
 #define TIM1 0
 #define TIM2 0

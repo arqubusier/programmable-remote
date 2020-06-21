@@ -1,12 +1,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-//#include "../googletest/googlemock/include/gmock/gmock.h"
+#include <execinfo.h>
 
 #define TESTING
 namespace hal {
 struct MockTag {};
 uint32_t timer_get_counter(MockTag, uint32_t tim) { return 0; }
-uint32_t timer_get_flag(MockTag, uint32_t tim, uint32_t flag) { return 0; }
+uint32_t timer_get_flag(MockTag, uint32_t tim, uint32_t flag) { return 1; }
 void timer_set_counter(MockTag, uint32_t tim, uint32_t count) {}
 } // namespace hal
 
@@ -83,10 +83,13 @@ TEST(StateMachine, Idling) {
  * \brief Test Sending a single command.
  */
 TEST(StateMachine, SendingSingle) {
-  Program prg({1, {1, {1}}});
+  Programs programs{{{1, {1, {1}}}}};
+  STable::CommonState common{programs};
 
-  util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{}};
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{},
+                                std::move(common), 0};
 
+  sm.send(STable::SendNextSegment{});
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
 }
@@ -96,21 +99,40 @@ TEST(StateMachine, SendingSingle) {
  */
 TEST(StateMachine, SendingSequence) {
   Command cmd{1, {1}};
-  Program prg{2, cmd, cmd};
+  Programs programs{{2, cmd, cmd}};
+  STable::CommonState common{programs};
 
-  util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{}};
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Sending>{},
+                                std::move(common), 0};
 
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
+  sm.send(STable::SendNextSegment{});
+  EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
+
   sm.send(STable::SendNextCommand{});
+  EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
+
+  sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
 }
+
+void terminate_handler() {
+  void *trace_store[20];
+#if 0
+  int trace_size = backtrace(trace_store, 20);
+  backtrace_symbols_fd(trace_store, trace_size, STDOUT_FILENO);
+#endif
+  std::abort();
+}
+
 } // namespace test
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleMock(&argc, argv);
   ::testing::InitGoogleTest(&argc, argv);
+  // std::set_terminate(test::terminate_handler);
   return RUN_ALL_TESTS();
 }
