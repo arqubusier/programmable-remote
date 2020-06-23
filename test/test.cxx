@@ -5,9 +5,10 @@
 #define TESTING
 namespace hal {
 struct MockTag {};
-uint32_t timer_get_counter(MockTag, uint32_t tim) { return 0; }
 uint32_t timer_get_flag(MockTag, uint32_t tim, uint32_t flag) { return 1; }
 void timer_set_counter(MockTag, uint32_t tim, uint32_t count) {}
+uint16_t g_counter_val = 0;
+uint32_t timer_get_counter(MockTag, uint32_t tim) { return g_counter_val; }
 } // namespace hal
 
 #include "ir.hpp"
@@ -82,7 +83,7 @@ TEST(StateMachine, Idling) {
 /*!
  * \brief Test Sending a single command.
  */
-TEST(StateMachine, SendingSingle) {
+TEST(StateMachineSending, SendingSingle) {
   Programs programs{{{1, {1, {1}}}}};
   STable::CommonState common{programs};
 
@@ -97,7 +98,7 @@ TEST(StateMachine, SendingSingle) {
 /*!
  * \brief Test Sending a sequence of commands of length > 1.
  */
-TEST(StateMachine, SendingSequence) {
+TEST(StateMachineSending, SendingSequence) {
   Command cmd{1, {1}};
   Programs programs{{2, cmd, cmd}};
   STable::CommonState common{programs};
@@ -117,6 +118,59 @@ TEST(StateMachine, SendingSequence) {
   EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
+}
+
+/*!
+ * \brief In the SelectingProgram State, the correct transitions must be made.
+ */
+TEST(StateMachineSelectingProgram, Transitions) {
+  STable::CommonState common{};
+
+  // SelectingProgram -> Receiving
+  {
+    util::StateMachine<STable> sm{
+        std::in_place_type_t<STable::SelectingProgram>{}, std::move(common)};
+    sm.send(STable::ButtonNumber{0});
+    EXPECT_TRUE(std::holds_alternative<STable::Receiving>(sm.state_));
+  }
+
+  // SelectingProgram -> Idling
+  {
+    util::StateMachine<STable> sm{
+        std::in_place_type_t<STable::SelectingProgram>{}, std::move(common)};
+    sm.send(STable::ButtonStop{});
+    EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
+  }
+}
+
+/*!
+ * \brief In 'Receiving', 'ButtonStop' cause transition to 'Idling'.
+ */
+TEST(Receiving, ToIdling) {
+  STable::CommonState common{};
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
+                                std::move(common)};
+  sm.send(STable::ButtonStop{});
+  EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
+}
+
+/*!
+ * \brief The segment durations must be stored in the common state.
+ * \details A fake timer value is used to stimulate the input handler.
+ */
+TEST(Receiving, Segment) {
+  hal::g_counter_val = 123;
+  Programs expected{{{1, {1, {hal::g_counter_val}}}}};
+  STable::CommonState common{};
+
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
+                                std::move(common)};
+
+  sm.send(STable::ReceiveToggle{});
+  sm.send(STable::ReceiveToggle{});
+  sm.send(STable::Timeout{});
+
+  EXPECT_EQ(common.programs_, expected);
 }
 
 void terminate_handler() {

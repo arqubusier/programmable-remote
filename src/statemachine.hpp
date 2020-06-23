@@ -39,6 +39,7 @@ template <typename OutputHandlerT> struct RemoteStateTable {
 
   struct SendNextSegment {};
   struct SendNextCommand {};
+  struct ReceiveToggle {};
   struct Timeout {};
 
   struct CommonState {
