@@ -92,13 +92,15 @@ public:
   }
 
   void stop() {
-#ifndef TEST
+#ifndef TESTING
     if (timer_get_flag(this->timer_.tim_, TIM_SR_UIF)) {
       timer_clear_flag(this->timer_.tim_, TIM_SR_UIF);
-      if (state_ > 1) {
+#endif
+      if (this->state_ > 1) {
         this->state_ = 0;
         this->reset();
       }
+#ifndef TESTING
     }
 #endif
   }

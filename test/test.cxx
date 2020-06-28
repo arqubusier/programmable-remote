@@ -1,5 +1,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include <algorithm>
 #include <execinfo.h>
 
 #define TESTING
@@ -168,11 +169,28 @@ TEST(StateMachineSelectingProgram, Select) {
  *-----------------------------------------------------------------------------/
 
 /*!
- * Verify that a single segment can be received.
+ * Verify that Idling is entered when pressing ButtonStop.
+ */
+TEST(Receiving, ButtonStop) {
+  STable::CommonState common{};
+
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
+                                std::move(common), 0};
+
+  sm.send(STable::ButtonStop{});
+  EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
+}
+
+/*!
+ * Verify that a when reciving a single segment, its data is stored but not
+confirmed.
+ *
+ * The program size must be zero to indicate that the command has not been
+confirmed.
  */
 TEST(Receiving, Segment) {
   hal::g_counter_val = 123;
-  Programs expected{{{1, {1, {hal::g_counter_val}}}}};
+  Programs expected{{{0, {1, {hal::g_counter_val}}}}};
   STable::CommonState common{};
 
   util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
@@ -182,57 +200,39 @@ TEST(Receiving, Segment) {
   sm.send(STable::ReceiveToggle{});
   sm.send(STable::Timeout{});
 
-  EXPECT_EQ(common.programs_, expected);
+  EXPECT_EQ(std::get<STable::Receiving>(sm.state_).programs_, expected);
 }
 
 /*!
- * Verify that a multiple segments can be received.
+ * Verify that a when reciving a multiple segments, data is stored but not
+confirmed.
+ *
+ * The program size must be zero to indicate that the command has not been
+confirmed.
  */
 TEST(Receiving, MultipleSegments) {
-  Programs expected{{{1, {1, {1, 2, 3}}}}};
+  size_t const program_size{3};
+  Programs expected{{{0, {program_size, {2, 3, 4}}}}};
   STable::CommonState common{};
 
   util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
                                 std::move(common), 0};
 
-  for (uint16_t segment : expected[0].array_[0].array_) {
+  sm.send(STable::ReceiveToggle{});
+  auto const &segments = expected[0].array_[0].array_;
+  std::for_each_n(segments.begin(), program_size, [&sm](auto segment) {
     hal::g_counter_val = segment;
     sm.send(STable::ReceiveToggle{});
-    sm.send(STable::ReceiveToggle{});
-  }
+  });
   sm.send(STable::Timeout{});
 
-  EXPECT_EQ(common.programs_, expected);
-}
-
-/*!
- * Verify that a multiple commands can be received, with empty command at the
- * end.
- */
-TEST(Receiving, MultipleCommands) {
-  Command cmd1 = {1, {1}};
-  Command cmd2 = {1, {2}};
-  Programs expected{{3, cmd1, cmd2}};
-  STable::CommonState common{};
-
-  util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
-                                std::move(common), 0};
-
-  for (auto const &cmd : expected[0].array_) {
-    hal::g_counter_val = cmd.array_[0];
-    sm.send(STable::ReceiveToggle{});
-    sm.send(STable::ReceiveToggle{});
-    sm.send(STable::Timeout{});
-    sm.send(STable::ButtonNext{});
-  }
-
-  EXPECT_EQ(common.programs_, expected);
+  EXPECT_EQ(std::get<STable::Receiving>(sm.state_).programs_, expected);
 }
 
 /*!
  * Verify that a multiple commands can be received.
  */
-TEST(Receiving, MultipleCommandsLastEmpty) {
+TEST(Receiving, MultipleCommands) {
   Command cmd1 = {1, {1}};
   Command cmd2 = {1, {2}};
   Programs expected{{2, cmd1, cmd2}};
@@ -241,19 +241,17 @@ TEST(Receiving, MultipleCommandsLastEmpty) {
   util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
                                 std::move(common), 0};
 
-  hal::g_counter_val = cmd1.array_[0];
-  sm.send(STable::ReceiveToggle{});
-  sm.send(STable::ReceiveToggle{});
-  sm.send(STable::Timeout{});
-  sm.send(STable::ButtonNext{});
+  for (auto const &cmd : {cmd1, cmd2}) {
+    hal::g_counter_val = cmd.array_[0];
+    sm.send(STable::ReceiveToggle{});
+    sm.send(STable::ReceiveToggle{});
+    sm.send(STable::Timeout{});
+    sm.send(STable::ButtonNext{});
+  }
 
-  hal::g_counter_val = cmd2.array_[0];
-  sm.send(STable::ReceiveToggle{});
-  sm.send(STable::ReceiveToggle{});
-  sm.send(STable::Timeout{});
-
-  EXPECT_EQ(common.programs_, expected);
+  EXPECT_EQ(std::get<STable::Receiving>(sm.state_).programs_, expected);
 }
+
 void terminate_handler() {
   void *trace_store[20];
 #if 0
