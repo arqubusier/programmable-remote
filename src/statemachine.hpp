@@ -29,7 +29,9 @@ struct StateId {
   };
 };
 
-template <typename OutputHandlerT> struct RemoteStateTable {
+template <typename Implementation> struct RemoteStateTable {
+  using OutputHandlerT = OutputHandler<Implementation>;
+  using InputHandlerT = InputHandler<Implementation>;
 
   // Events
   using ButtonNumber = uint32_t;
@@ -54,64 +56,59 @@ template <typename OutputHandlerT> struct RemoteStateTable {
     Idling(CommonState &&common) : CommonState(std::move(common)) {}
   };
 
-  struct Sending : CommonState {
+  struct Tranceiving : CommonState {
     uint32_t cmd_timer_freq_ = 2 * MEGA;
     util::Timer cmd_timer_;
     util::Timer carrier_timer_;
-    OutputHandlerT handler_;
     size_t command_index_;
     size_t program_index_;
 
     // Sending() : Sending(CommonState{}, 0) {}
-    Sending() = delete; // Sending(CommonState{}, 0) {}
-    Sending(Sending &&other) = default;
-    Sending(CommonState &&common, ButtonNumber const &program_index)
+    Tranceiving() = delete; // Sending(CommonState{}, 0) {}
+    Tranceiving(Tranceiving &&other) = default;
+    Tranceiving(CommonState &&common, ButtonNumber const &program_index)
         : CommonState{std::move(common)},
           cmd_timer_{TIM3, TIM_OC1, 36,
                      util::ns2count(cmd_timer_freq_, 24 * MEGA)},
           carrier_timer_{TIM4, TIM_OC1, 36,
                          util::ns2count(cmd_timer_freq_, 24 * MEGA)},
-          handler_(cmd_timer_, carrier_timer_), command_index_{0},
-          program_index_{program_index} {
-      handler_.send(this->get_program().array_[0]);
-    }
+          command_index_{0}, program_index_{program_index} {}
 
-    Sending &operator=(Sending &&other) = default;
-
-    void swap(Sending &other) {
-      cmd_timer_freq_ = other.cmd_timer_freq_;
-      cmd_timer_ = std::move(other.cmd_timer_);
-      carrier_timer_ = std::move(other.cmd_timer_);
-      handler_ = std::move(handler_);
-    }
+    Tranceiving &operator=(Tranceiving &&other) = default;
 
     Program &get_program() { return this->programs_[this->program_index_]; }
   };
 
+  struct Sending : Tranceiving {
+    OutputHandlerT handler_;
+
+    Sending(CommonState &&common, ButtonNumber const &program_index)
+        : Tranceiving(std::move(common), program_index),
+          handler_(this->cmd_timer_, this->carrier_timer_) {
+      this->handler_.send(this->get_program().array_[0]);
+    }
+    Sending() = delete;
+    Sending(Sending &&other) = default;
+    Sending &operator=(Sending &&other) = default;
+  };
+
+  struct Receiving : Tranceiving {
+    InputHandlerT handler_;
+
+    Receiving(CommonState &&common, ButtonNumber const &program_index)
+        : Tranceiving(std::move(common), program_index),
+          handler_(this->carrier_timer_) {}
+    Receiving() = delete;
+    Receiving(Receiving &&other) = default;
+    Receiving &operator=(Receiving &&other) = default;
+  };
+
   struct SelectingProgram : CommonState {
+    ButtonNumber program_index_ = 0;
     SelectingProgram() = default;
     SelectingProgram(SelectingProgram &&other) = default;
     SelectingProgram &operator=(SelectingProgram &&other) = default;
     SelectingProgram(CommonState &&common) : CommonState{std::move(common)} {}
-  };
-  struct WaitingNextSend : CommonState {
-    WaitingNextSend() = default;
-    WaitingNextSend(WaitingNextSend &&other) = default;
-    WaitingNextSend &operator=(WaitingNextSend &&other) = default;
-    WaitingNextSend(CommonState &&common) : CommonState{std::move(common)} {}
-  };
-  struct Receiving : CommonState {
-    Receiving() = default;
-    Receiving(Receiving &&other) = default;
-    Receiving &operator=(Receiving &&other) = default;
-    Receiving(CommonState &&common) : CommonState{std::move(common)} {}
-  };
-  struct WaitingReceiveQuiet : CommonState {
-    WaitingReceiveQuiet() = default;
-    WaitingReceiveQuiet(WaitingReceiveQuiet &&other) = default;
-    WaitingReceiveQuiet &operator=(WaitingReceiveQuiet &&other) = default;
-    WaitingReceiveQuiet(CommonState &&common)
-        : CommonState{std::move(common)} {}
   };
 
   struct RemoteTypes {
@@ -120,10 +117,11 @@ template <typename OutputHandlerT> struct RemoteStateTable {
 
   //  using StateStorage = util::StateStorage<Idling, Sending>;
   using StateStorage =
-      util::StateStorage<Idling, Sending, WaitingNextSend, SelectingProgram,
-                         Receiving, WaitingReceiveQuiet>;
+      util::StateStorage<Idling, Sending, SelectingProgram, Receiving>;
 
   // Handlers
+
+  // Sending
   static StateStorage receive(Idling &state, ButtonNumber const &program) {
     return Sending{std::move(state), program};
   }
@@ -134,7 +132,8 @@ template <typename OutputHandlerT> struct RemoteStateTable {
 
   static StateStorage receive(Sending &state, SendNextSegment const &) {
     Program &program{state.get_program()};
-    switch (state.handler_.handle(state.handler_)) {
+    switch (state.handler_.handle(state.handler_,
+                                  program.array_[state.command_index_])) {
     case OutputHandlerT::CONTINUE:
       return Sending{std::move(state)};
     case OutputHandlerT::STOP:
@@ -151,9 +150,46 @@ template <typename OutputHandlerT> struct RemoteStateTable {
     }
   }
 
-  static StateStorage receive(Sending &state, SendNextCommand const &) {
+  static StateStorage receive(Sending &state, Timeout const &) {
     state.handler_.send(state.get_program().array_[state.command_index_]);
     return Sending(std::move(state));
+  }
+
+  // SelectingProgram
+  static StateStorage receive(SelectingProgram &state,
+                              ButtonNumber const &number) {
+    state.program_index_ = number;
+    return SelectingProgram{std::move(state)};
+  }
+
+  static StateStorage receive(SelectingProgram &state, ButtonNext const &) {
+    return Receiving{std::move(state), state.program_index_};
+  }
+
+  static StateStorage receive(SelectingProgram &state, ButtonStop const &) {
+    return Idling{std::move(state)};
+  }
+
+  // Receiving
+  static StateStorage receive(Receiving &state, ReceiveToggle const &) {
+    state.handler_.handle(state.handler_,
+                          state.get_program().array_[state.command_index_]);
+    return Receiving{std::move(state)};
+  }
+
+  static StateStorage receive(Receiving &state, ButtonNext const &) {
+    state.command_index_++;
+    state.get_program().size_++;
+    return Receiving{std::move(state)};
+  }
+
+  static StateStorage receive(Receiving &state, Timeout const &) {
+    state.handler_.stop();
+    return Receiving{std::move(state)};
+  }
+
+  static StateStorage receive(Receiving &state, ButtonStop const &) {
+    return Idling{std::move(state)};
   }
 
   template <typename State, typename Event>

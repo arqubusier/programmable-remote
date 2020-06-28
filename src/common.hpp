@@ -5,7 +5,7 @@
 #include <bits/stdint-uintn.h>
 
 struct Command {
-  static uint16_t const SECTION_LIMIT = 100;
+  static uint16_t const SECTION_LIMIT = 20;
   size_t size_;
   std::array<uint16_t, SECTION_LIMIT> array_;
 };

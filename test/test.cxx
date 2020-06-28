@@ -33,7 +33,7 @@ struct OutputHandlerMock {
 uint32_t OutputHandlerMock::n_send_calls = 0;
 
 // using STable = RemoteStateTable<OutputHandlerMock>;
-using STable = RemoteStateTable<OutputHandler<hal::MockTag>>;
+using STable = RemoteStateTable<hal::MockTag>;
 using StateMachineT = util::StateMachine<STable>;
 
 namespace test {
@@ -111,7 +111,7 @@ TEST(StateMachineSending, SendingSequence) {
   sm.send(STable::SendNextSegment{});
   EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
 
-  sm.send(STable::SendNextCommand{});
+  sm.send(STable::Timeout{});
   EXPECT_TRUE(std::holds_alternative<STable::Sending>(sm.state_));
 
   sm.send(STable::SendNextSegment{});
@@ -130,7 +130,7 @@ TEST(StateMachineSelectingProgram, Transitions) {
   {
     util::StateMachine<STable> sm{
         std::in_place_type_t<STable::SelectingProgram>{}, std::move(common)};
-    sm.send(STable::ButtonNumber{0});
+    sm.send(STable::ButtonNext{});
     EXPECT_TRUE(std::holds_alternative<STable::Receiving>(sm.state_));
   }
 
@@ -144,19 +144,31 @@ TEST(StateMachineSelectingProgram, Transitions) {
 }
 
 /*!
- * \brief In 'Receiving', 'ButtonStop' cause transition to 'Idling'.
+ * Verify that the selected program matches the pressed button
  */
-TEST(Receiving, ToIdling) {
+TEST(StateMachineSelectingProgram, Select) {
   STable::CommonState common{};
-  util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
-                                std::move(common)};
-  sm.send(STable::ButtonStop{});
-  EXPECT_TRUE(std::holds_alternative<STable::Idling>(sm.state_));
+
+  // SelectingProgram -> Receiving
+  for (uint16_t index : {uint16_t{0}, uint16_t{1}}) {
+    util::StateMachine<STable> sm{
+        std::in_place_type_t<STable::SelectingProgram>{}, std::move(common)};
+    sm.send(STable::ButtonNumber{index});
+    EXPECT_TRUE(std::holds_alternative<STable::SelectingProgram>(sm.state_));
+    EXPECT_EQ(std::get<STable::SelectingProgram>(sm.state_).program_index_,
+              index);
+  }
 }
 
+/*------------------------------------------------------------------------------
+ * Receive tests
+ *
+ * A fake timer value is used to stimulate the input
+ * handler.
+ *-----------------------------------------------------------------------------/
+
 /*!
- * \brief The segment durations must be stored in the common state.
- * \details A fake timer value is used to stimulate the input handler.
+ * Verify that a single segment can be received.
  */
 TEST(Receiving, Segment) {
   hal::g_counter_val = 123;
@@ -164,7 +176,7 @@ TEST(Receiving, Segment) {
   STable::CommonState common{};
 
   util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
-                                std::move(common)};
+                                std::move(common), 0};
 
   sm.send(STable::ReceiveToggle{});
   sm.send(STable::ReceiveToggle{});
@@ -173,6 +185,75 @@ TEST(Receiving, Segment) {
   EXPECT_EQ(common.programs_, expected);
 }
 
+/*!
+ * Verify that a multiple segments can be received.
+ */
+TEST(Receiving, MultipleSegments) {
+  Programs expected{{{1, {1, {1, 2, 3}}}}};
+  STable::CommonState common{};
+
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
+                                std::move(common), 0};
+
+  for (uint16_t segment : expected[0].array_[0].array_) {
+    hal::g_counter_val = segment;
+    sm.send(STable::ReceiveToggle{});
+    sm.send(STable::ReceiveToggle{});
+  }
+  sm.send(STable::Timeout{});
+
+  EXPECT_EQ(common.programs_, expected);
+}
+
+/*!
+ * Verify that a multiple commands can be received, with empty command at the
+ * end.
+ */
+TEST(Receiving, MultipleCommands) {
+  Command cmd1 = {1, {1}};
+  Command cmd2 = {1, {2}};
+  Programs expected{{3, cmd1, cmd2}};
+  STable::CommonState common{};
+
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
+                                std::move(common), 0};
+
+  for (auto const &cmd : expected[0].array_) {
+    hal::g_counter_val = cmd.array_[0];
+    sm.send(STable::ReceiveToggle{});
+    sm.send(STable::ReceiveToggle{});
+    sm.send(STable::Timeout{});
+    sm.send(STable::ButtonNext{});
+  }
+
+  EXPECT_EQ(common.programs_, expected);
+}
+
+/*!
+ * Verify that a multiple commands can be received.
+ */
+TEST(Receiving, MultipleCommandsLastEmpty) {
+  Command cmd1 = {1, {1}};
+  Command cmd2 = {1, {2}};
+  Programs expected{{2, cmd1, cmd2}};
+  STable::CommonState common{};
+
+  util::StateMachine<STable> sm{std::in_place_type_t<STable::Receiving>{},
+                                std::move(common), 0};
+
+  hal::g_counter_val = cmd1.array_[0];
+  sm.send(STable::ReceiveToggle{});
+  sm.send(STable::ReceiveToggle{});
+  sm.send(STable::Timeout{});
+  sm.send(STable::ButtonNext{});
+
+  hal::g_counter_val = cmd2.array_[0];
+  sm.send(STable::ReceiveToggle{});
+  sm.send(STable::ReceiveToggle{});
+  sm.send(STable::Timeout{});
+
+  EXPECT_EQ(common.programs_, expected);
+}
 void terminate_handler() {
   void *trace_store[20];
 #if 0

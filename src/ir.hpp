@@ -13,25 +13,25 @@ protected:
   using Implementation = ImplementationTag;
 
   uint32_t state_;
-  Command command_;
 
 public:
   enum Result { CONTINUE, STOP, ERROR };
   using ResultT = typename PulseHandler<ImplementationTag>::Result;
 
-  PulseHandler() : state_{0}, command_{} {}
+  PulseHandler() : state_{0} {}
   PulseHandler(PulseHandler &&other) = default;
   PulseHandler &operator=(PulseHandler &&other) = default;
 
   template <typename HandlerImplementationT>
-  ResultT handle(HandlerImplementationT &handler_implementation) {
+  ResultT handle(HandlerImplementationT &handler_implementation,
+                 Command &command) {
     if (this->state_ >= Command::SECTION_LIMIT) {
       this->state_ = 0;
       handler_implementation.reset();
       this->fail();
     }
 
-    ResultT res = handler_implementation.handle_sub(this->state_);
+    ResultT res = handler_implementation.handle_sub(this->state_, command);
     switch (res) {
     case CONTINUE:
       this->state_++;
@@ -72,7 +72,7 @@ public:
   InputHandler(InputHandler &&other) = default;
   InputHandler &operator=(InputHandler &&other) = default;
 
-  ResultT handle_sub(uint32_t state) {
+  ResultT handle_sub(uint32_t state, Command &command) {
     ResultT result = ResultT::ERROR;
     uint32_t delta =
         hal::timer_get_counter(Implementation{}, this->timer_.tim_);
@@ -80,10 +80,10 @@ public:
 
     if (state == 0) {
       NOT_IN_TEST(timer_enable_counter(this->timer_.tim_));
-      this->command_.size_ = 0;
+      command.size_ = 0;
     } else {
-      this->command_.array_[this->command_.size_] = delta;
-      this->command_.size_++;
+      command.array_[command.size_] = delta;
+      command.size_++;
       NOT_IN_TEST(timer_clear_flag(this->timer_.tim_, TIM_SR_UIF));
     }
     result = ResultT::CONTINUE;
@@ -152,13 +152,10 @@ public:
    * and turns on its output. ARR is set with the first timeout, which will be
    * active when the timer is enabled.
    */
-  void send(const Command &to_send) {
-    std::copy(to_send.array_.begin(), to_send.array_.begin() + to_send.size_,
-              this->command_.array_.begin());
-    this->command_.size_ = to_send.size_;
+  void send(const Command &command) {
 // Prepare delta for first segment
 #ifndef TESTING
-    timer_set_period(this->cmd_timer_.tim_, this->command_.array_[0]);
+    timer_set_period(this->cmd_timer_.tim_, command.array_[0]);
     timer_enable_counter(this->cmd_timer_.tim_);
     timer_enable_counter(this->carrier_timer_.tim_);
     timer_enable_oc_output(this->carrier_timer_.tim_,
@@ -170,7 +167,7 @@ public:
    *  \details ARR is set with the first timeout, which will be active when the
    *           timer is enabled.
    */
-  ResultT handle_sub(uint32_t state) {
+  ResultT handle_sub(uint32_t state, Command &command) {
     ResultT result = ResultT::ERROR;
 
     // Interrupt fires immediately when timer is enabled, therefore
@@ -186,22 +183,22 @@ public:
         // next segment is carrier pulse
         NOT_IN_TEST(timer_enable_oc_output(this->carrier_timer_.tim_,
                                            this->carrier_timer_.channel_));
-        if (this->state_ + 1 < this->command_.size_) {
+        if (this->state_ + 1 < command.size_) {
           result = ResultT::CONTINUE;
         }
       } else {
         // next segment is space
         NOT_IN_TEST(timer_disable_oc_output(this->carrier_timer_.tim_,
                                             this->carrier_timer_.channel_));
-        if (this->state_ + 1 < this->command_.size_ - 1) {
+        if (this->state_ + 1 < command.size_ - 1) {
           result = ResultT::CONTINUE;
         }
       }
 
       // Prepare delta for coming segment
-      if (this->state_ + 1 < this->command_.size_) {
+      if (this->state_ + 1 < command.size_) {
         NOT_IN_TEST(timer_set_period(this->cmd_timer_.tim_,
-                                     this->command_.array_[this->state_ + 1]));
+                                     command.array_[this->state_ + 1]));
       }
     }
 
