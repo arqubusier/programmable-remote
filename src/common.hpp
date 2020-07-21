@@ -2,12 +2,12 @@
 #define COMMON_HPP
 
 #include <array>
-#include <bits/stdint-uintn.h>
+#include <cstdint>
 
 struct Command {
-  static uint16_t const SECTION_LIMIT = 20;
+  static uint16_t const SEGMENT_LIMIT = 100;
   size_t size_;
-  std::array<uint16_t, SECTION_LIMIT> array_;
+  std::array<uint16_t, SEGMENT_LIMIT> array_;
 };
 
 bool operator==(Command const &lhs, Command const &rhs) {

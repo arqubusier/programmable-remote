@@ -6,29 +6,6 @@
 #include "util_libopencm3.hpp"
 #include <exception>
 
-struct EventId {
-  enum {
-    BUTTON_NUMBER,
-    BUTTON_NEXT,
-    BUTTON_STOP,
-    SEND_DONE,
-    SEND_NEXT,
-    TIMEOUT
-  };
-};
-
-struct StateId {
-  enum {
-    IDLING,
-    SENDING,
-    WAITING_NEXT_SEND,
-    SELECTING_PROGRAM,
-    RECEIVING,
-    WAITING_RECEIVE_QUIET,
-    NUMBER_OF_STATES
-  };
-};
-
 template <typename Implementation> struct RemoteStateTable {
   using OutputHandlerT = OutputHandler<Implementation>;
   using InputHandlerT = InputHandler<Implementation>;
@@ -192,9 +169,13 @@ template <typename Implementation> struct RemoteStateTable {
     return Idling{std::move(state)};
   }
 
+  /*!
+   * Sink for undefined transitions.
+   *
+   * If this function is called, there is a bug.
+   */
   template <typename State, typename Event>
   static StateStorage receive(State &state, Event const &) {
-    std::terminate();
     return Idling{std::move(state)};
   }
 }; // RemoteStateTable

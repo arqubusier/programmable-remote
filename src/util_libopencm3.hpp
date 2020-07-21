@@ -2,6 +2,7 @@
 #define UTIL_LIBPOPENCM3_HPP
 
 #include <cstdlib>
+#include <optional>
 #include <stdint.h>
 
 #include "etl/utility.h"
@@ -62,6 +63,79 @@ constexpr etl::pair<uint8_t, bool> GetTimerIrqn(uint32_t tim) {
   }
   return {0, false};
 }
+
+constexpr std::optional<uint8_t> GetExti(uint32_t pin) {
+  switch (pin) {
+  case GPIO0:
+    return EXTI0;
+  case GPIO1:
+    return EXTI1;
+  case GPIO2:
+    return EXTI2;
+  case GPIO3:
+    return EXTI3;
+  case GPIO4:
+    return EXTI4;
+  case GPIO5:
+    return EXTI5;
+  case GPIO6:
+    return EXTI6;
+  case GPIO7:
+    return EXTI7;
+  case GPIO8:
+    return EXTI8;
+  case GPIO9:
+    return EXTI9;
+  case GPIO10:
+    return EXTI10;
+  case GPIO11:
+    return EXTI11;
+  case GPIO12:
+    return EXTI12;
+  case GPIO13:
+    return EXTI13;
+  case GPIO14:
+    return EXTI14;
+  case GPIO15:
+    return EXTI15;
+  }
+  return {};
+}
+constexpr std::optional<uint8_t> GetExtiIrqn(uint32_t exti) {
+  switch (exti) {
+  case EXTI1:
+    return NVIC_EXTI1_IRQ;
+  case EXTI2:
+    return NVIC_EXTI2_IRQ;
+  case EXTI3:
+    return NVIC_EXTI3_IRQ;
+  case EXTI4:
+    return NVIC_EXTI4_IRQ;
+  case EXTI5:
+    return NVIC_EXTI9_5_IRQ;
+  case EXTI6:
+    return NVIC_EXTI9_5_IRQ;
+  case EXTI7:
+    return NVIC_EXTI9_5_IRQ;
+  case EXTI8:
+    return NVIC_EXTI9_5_IRQ;
+  case EXTI9:
+    return NVIC_EXTI9_5_IRQ;
+  case EXTI10:
+    return NVIC_EXTI15_10_IRQ;
+  case EXTI11:
+    return NVIC_EXTI15_10_IRQ;
+  case EXTI12:
+    return NVIC_EXTI15_10_IRQ;
+  case EXTI13:
+    return NVIC_EXTI15_10_IRQ;
+  case EXTI14:
+    return NVIC_EXTI15_10_IRQ;
+  case EXTI15:
+    return NVIC_EXTI15_10_IRQ;
+  }
+  return {};
+}
 #endif
 
 struct Timer {
@@ -82,6 +156,11 @@ constexpr uint32_t ns2count(uint32_t frequency, uint32_t val_ns) {
 struct io_t {
   uint32_t port;
   uint32_t pin;
+};
+
+struct Io {
+  uint32_t port_;
+  uint32_t pin_;
 };
 
 /*

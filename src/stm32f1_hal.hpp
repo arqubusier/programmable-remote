@@ -22,20 +22,20 @@ using tim_oc_id = uint32_t;
 
 namespace hal {
 
-struct hw_tag {};
+struct HwTag {};
 
-uint32_t timer_get_counter(hw_tag, uint32_t tim) {
+uint32_t timer_get_counter(HwTag, uint32_t tim) {
   uint32_t res;
-  NOT_IN_TEST(::timer_get_counter(tim);)
+  NOT_IN_TEST(res = ::timer_get_counter(tim);)
   return res;
 }
-uint32_t timer_get_flag(hw_tag, uint32_t tim, uint32_t flag) {
+uint32_t timer_get_flag(HwTag, uint32_t tim, uint32_t flag) {
   uint32_t res;
   NOT_IN_TEST(res = ::timer_get_flag(tim, flag));
   return res;
 }
-void timer_set_counter(hw_tag, uint32_t tim, uint32_t count) {
-  NOT_IN_TEST(::timer_set_counter(tim, val));
+void timer_set_counter(HwTag, uint32_t tim, uint32_t count) {
+  NOT_IN_TEST(::timer_set_counter(tim, count));
 }
 
 }; // namespace hal
