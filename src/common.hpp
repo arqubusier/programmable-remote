@@ -24,7 +24,7 @@ bool operator==(Program const &lhs, Program const &rhs) {
   return (lhs.size_ == rhs.size_ && lhs.array_ == rhs.array_);
 }
 
-uint16_t const N_PROGRAMS = 10;
+uint16_t const N_PROGRAMS = 5;
 using Programs = std::array<Program, N_PROGRAMS>;
 
 #endif // COMMON_HPP
