@@ -34,7 +34,7 @@ util::Timer output_carrier_timer{TIM2, TIM_OC1, 0, 947};
 constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
 // constexpr const util::io_t output_ir{GPIOA,GPIO6}; // TIM3 CH1 output
 
-constexpr size_t kNumButtons{12};
+constexpr size_t kNumButtons{7};
 using Buttons = std::array<util::Io, kNumButtons>;
 constexpr Buttons buttons{{
     {GPIOA, GPIO1},
@@ -42,11 +42,6 @@ constexpr Buttons buttons{{
     {GPIOA, GPIO3},
     {GPIOA, GPIO4},
     {GPIOA, GPIO5},
-    {GPIOA, GPIO6},
-    {GPIOA, GPIO7},
-    {GPIOA, GPIO8},
-    {GPIOA, GPIO9},
-    {GPIOA, GPIO10},
     {GPIOA, GPIO11},
     {GPIOA, GPIO12},
 }};
@@ -76,6 +71,16 @@ util::StateMachine<STable> state_machine{
 /*
  * Setup
  */
+
+/*!
+ * Enable fault handlers.
+ */
+static void fault_setup(void) {
+  nvic_enable_irq(-10);
+  nvic_enable_irq(-11);
+  nvic_enable_irq(-12);
+}
+
 static void clock_setup(void) {
   rcc_clock_setup_in_hse_8mhz_out_72mhz();
 
@@ -114,11 +119,19 @@ static void gpio_setup(void) {
   exti_enable_request(EXTI1);
 }
 
+/*
+ * Each switch is connected to a
+ * a common high potential and its own button input.
+ * Button inputs have pull-downs.
+ */
 void buttons_setup() {
   for (const auto &button : buttons) {
     uint32_t exti{util::GetExtiIrqn(button.pin_).value()};
-    gpio_set_mode(button.port_, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT,
+    gpio_set_mode(button.port_, GPIO_MODE_INPUT, GPIO_CNF_INPUT_PULL_UPDOWN,
                   button.pin_);
+    uint16_t odr = gpio_port_read(button.port_);
+    gpio_port_write(button.port_, odr | (1 << button.pin_));
+
     nvic_enable_irq(exti);
     exti_select_source(exti, button.port_);
     exti_set_trigger(exti, EXTI_TRIGGER_RISING);
@@ -130,40 +143,95 @@ void buttons_setup() {
  * Isrs
  */
 extern "C" {
+void debug_hard_fault(uint32_t *stack) {
+  volatile uint32_t icsr = SCB_ICSR;
+  volatile uint32_t cfsr = SCB_CFSR;
+  volatile uint32_t hfsr = SCB_HFSR;
+
+  volatile uint32_t r0 = stack[0];
+  volatile uint32_t r1 = stack[1];
+  volatile uint32_t r2 = stack[2];
+  volatile uint32_t r3 = stack[3];
+  volatile uint32_t r12 = stack[4];
+  volatile uint32_t lr = stack[5];
+  volatile uint32_t pc = stack[6];
+  volatile uint32_t psr = stack[7];
+
+  // hardware breakpoint
+  __asm volatile("BKPT #01");
+}
+
+void hard_fault_handler(void) {
+  __asm("MRS r0, MSP\n" // Default to the Main Stack Pointer
+        "MOV r1, lr\n"  // Load the current link register value
+        "MOVS r2, #4\n"
+        "TST r1, r2\n"           // Test whether we are in master or thread mode
+        "BEQ debug_hard_fault\n" // If in master mode, MSP is correct.
+        "MRS r0, PSP\n"        // If we weren't in master mode, load PSP instead
+        "B debug_hard_fault"); // Jump to the fault handler.
+}
+
+void mem_manage_handler(void) {
+  volatile uint32_t cfsr = SCB_CFSR;
+  volatile uint32_t mmfar = SCB_MMFAR;
+  while (1) {
+    ;
+  }
+}
+void bus_fault_handler(void) {
+  volatile uint32_t cfsr = SCB_CFSR;
+  volatile uint32_t bfar = SCB_BFAR;
+  while (1) {
+    ;
+  }
+}
+void usage_fault_handler(void) {
+  volatile uint32_t cfsr = SCB_CFSR;
+  while (1) {
+    ;
+  }
+}
+
 void exti0_isr(void) {
   exti_reset_request(EXTI1);
   state_machine.send(STable::ReceiveToggle{});
 }
 
-void exti1_isr(void) { state_machine.send(STable::ButtonNumber{0}); }
+void exti1_isr(void) {
+  exti_reset_request(EXTI1);
+  state_machine.send(STable::ButtonNumber{0});
+}
 
-void exti2_isr(void) { state_machine.send(STable::ButtonNumber{1}); }
+void exti2_isr(void) {
+  exti_reset_request(EXTI1);
+  state_machine.send(STable::ButtonNumber{1});
+}
 
-void exti3_isr(void) { state_machine.send(STable::ButtonNumber{2}); }
+void exti3_isr(void) {
+  exti_reset_request(EXTI1);
+  state_machine.send(STable::ButtonNumber{2});
+}
 
-void exti4_isr(void) { state_machine.send(STable::ButtonNumber{3}); }
+void exti4_isr(void) {
+  exti_reset_request(EXTI1);
+  state_machine.send(STable::ButtonNumber{3});
+}
 
-void exti5_isr(void) { state_machine.send(STable::ButtonNumber{4}); }
+void exti9_5_isr(void) {
+  exti_reset_request(EXTI1);
+  state_machine.send(STable::ButtonNumber{4});
+}
 
-void exti6_isr(void) { state_machine.send(STable::ButtonNumber{5}); }
-
-void exti7_isr(void) { state_machine.send(STable::ButtonNumber{6}); }
-
-void exti8_isr(void) { state_machine.send(STable::ButtonNumber{7}); }
-
-void exti9_isr(void) { state_machine.send(STable::ButtonNumber{8}); }
-
-void exti10_isr(void) { state_machine.send(STable::ButtonNumber{9}); }
-
-void exti11_isr(void) { state_machine.send(STable::ButtonStop{}); }
-
-void exti12_isr(void) { state_machine.send(STable::ButtonNext{}); }
+void exti10_15_isr(void) {
+  exti_reset_request(EXTI1);
+  state_machine.send(STable::ButtonNumber{5});
+}
 
 void tim3_isr(void) { state_machine.send(STable::SendNextSegment{}); }
 
 void tim4_isr(void) {
   state_machine.send(STable::SendNextSegment{});
-  gpio_toggle(led_fail.port, led_fail.pin);
+  // gpio_toggle(led_fail.port, led_fail.pin);
 }
 }
 
@@ -174,7 +242,7 @@ void *__dso_handle = nullptr;
  * Main
  */
 int main(void) {
-  nvic_get_irq_enabled(NVIC_EXTI1_IRQ);
+  fault_setup();
   clock_setup();
   gpio_setup();
   buttons_setup();
