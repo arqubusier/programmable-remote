@@ -1,0 +1,322 @@
+* General
+** General algorihm
+Assume protocol has a series of bursts.
+For sensing, store length of every burst and space.
+
+*** Determine length of message
+Must not confuse message with repeat message.
+
+Timeout: assume time limit for section (burst or space)
+< 23.939 ms for NEC2 (All ones)
+24/0.005 = 48000
+
+Limit on number of sections.
+
+
+*** Repeat message/multiple messages
+
+** IR Communication
+diode frequencies:
+
+*** PWM-based
+38kHz common signal to use for pulses.
+
+http://irdb.tk/find/
+
+**** NEC
+8 bit address, 8 bit inverse address, 8bit command, 8bit inverse command
+https://techdocs.altium.com/display/FPGA/NEC+Infrared+Transmission+Protocol
+**** NEC2
+https://www.sbprojects.net/knowledge/ir/nec.php
+16 bit address, 16bit command
+
+**** Epson projector
+Protocol NEC2
+**** Harman Kardon
+Harman Kardon Receivers: Protocol Emerson device 40 subdevice -1
+Harman Kardon Receivers: Protocol NEC device 128 subdevice 112
+Harman Kardon Receivers: Protocol NEC1 device 4 subdevice -1
+Harman Kardon Receivers: Protocol NEC1 device 128 subdevice 112
+Harman Kardon Receivers: Protocol NEC1 device 130 subdevice 114
+Harman Kardon Receivers: Protocol NEC1 device 132 subdevice 66
+Harman Kardon Receivers: Protocol NEC1 device 132 subdevice 116
+Harman Kardon Receivers: Protocol NEC1 device 134 subdevice 118
+Harman Kardon Receivers: Protocol NEC2 device 128 subdevice 112
+Harman Kardon Receivers: Protocol NEC2 device 130 subdevice 114
+Harman Kardon Receivers: Protocol NEC2 device 164 subdevice -1
+Harman Kardon Receivers: Protocol Pioneer device 130 subdevice 114
+Harman Kardon Receivers: Protocol Pioneer device 161 subdevice -1
+Harman Kardon Receivers: Protocol RCA-38 device 7 subdevice -1
+
+** Remotes
+*** Harman Kardon
+carrier 587 us - 560us
+
+OK 7484 6f90
+
+
+
+NEC1
+OK 0x12 e2 90 6F
+18 226
+
+NEC2
+OK 0xe212  6F90
+
+*** Epson
+carrier 587 us - 625 us
+*** OSSC
+carrier 562 us - 612 us
+** Components
+*** IR diode
+*** IR receiver
+https://www.electrokit.com/uploads/productfile/41015/41015734_-_IR_Receiver_Module.pdf
+negative and signal marked on board, middle is vcc 0.4v-4.4v.
+**** TSOP382
+combined led and "demodulator", turns 38
+  
+Program ir sequences using sensed signals from existisng remote.
+Use a button combination to enter programming mode.
+Use the following algorithm to create a program.
+
+DRAW DIAGRAM.
+1. Press programming button. leds start flashinsg to indicate programming mode.
+   press number to select slot and continue.
+2. Press a button on other remote to select command.
+   Leds indicate success/failure.
+   Use stop sequence to stop.
+   The current program will be stored and a default value
+3. Enter repeate count. Use reset button to clear. Use confirm button to proceed.
+4. Press stop sequence to finish, otherwise Go to step 2
+
+Sens signals from remote when programming.
+
+** Components
+- Bluepill devboard.
+- ir sensor.
+- ir led.
+- keyboard matrix
+- leds (yellow, green, red)
+- (display)
+  
+** IR NEC Timings
+Bit Pulse length 560us
+
+[[./necmodulation.png]]
+[[./nectrain.png]]
+./necsequence.png
+
+Max duration 100 ms, repeat distance.
+Min 560us
+
+*** Pulse lengths
+- Sequence timer
+- command timer (maybe reprogram sequence timer on the fly)
+- carrier timer
+
+16bit prescaler
+16bit counter
+
+16bit counter 2^16-1 = 65535
+
+RCC 72MHz
+ABP1 Max 36Mhz
+
+*** Command input handling
+Prescaler 10 Us period = 0.1 MHz = 100KHz: <=> 10e-6 * 65e3 = 650e-3 = max 650 ms counter
+Prescaler 2 us period =  0.5 MHz = 500KHz: <=> 2e-6 * 65e3 = 130e-3 = max 130 ms counter
+
++++ Prescaler 5 Us period = 0.2 MHz = 200KHz: <=> 5e-6 * 65e3 = 325e-3 = max 325 ms counter
+    set prescaler to ABP1*2/200e3 = 36e6/200e3 = 36e6/2e5 = 180
+
+ir sensor sensing pin is connected to GPIOA1.
+GPIO1A is configured to trigger interrupts. EXTI1.
+
+Start timer when ir sensor goes low. Then stop when goes high and save value.
+Interrupt on sensing pin.
+Start timer on falling edge interrupt, Stop timer and read value on rising endge interrupt.
+
+
+*** Carrier frequency
+
+To keep the phase of the carrier pulse, start timer at beginning of command and keep it running until the end.
+Control the carrier pulse output by enabling/disabling the output.
+A separate timer is used for the carrier pulse.
+
+38kHz ca 0.23 us
+Use toggle output of timer.
+The output toggles at double frequency 76Khz.
+Use approximation for the period
+0.013157894736842105263157894736842105263157894736842105263... ms
+13.157894736842105263157894736842105263157894736842105263... us
+
+no prescaler:
+13.1578947us/(1/36Mhz) = 13.1578947us*36Mhz = 13.1578947*36 = 473.682 
+474 * (1/36MHz) = 474*(1/36)us = 13.16666... us
+
+Use upcounting mode TIMx_CR1, TIMx_CR2
+Use continuous mode (not One-pulse mode)
+autoreload 947 TIMx_ARR, TIMx_CR1, TIMx_CR2
+compare 947 TIMx_CCRx, disable preload OCxPE bit in the TIMx_CCMRx register
+output toggle mode, OCxM bits in the TIMx_CCMRx register (OCxM=011)
+disable interrupt (CCXIE bit in the TIMx_DIER register)
+disable dma (CCxDE bit in the TIMx_DIER register)
+**** TODO Use TIM1 for higher precision? 72Mhz vs 36Mhz
+     Cannot get it to work.
+works for TIM2 and TIM3.
+Tim1 uses ABP2 Different config needed?
+Tim1 has extra features? which? different config needed?
+
+
+** Sensing
+
+Use a timer, diff-timer, to measure pulse lengths.
+When triggered follow sensing algorithm based on state machine.
+Compare elapsed duration since previous trigger and evaluate expected duration based on current state.
+If evaluation fails, goto backoff state of algorithm.
+Restart timer.
+
+Detect overlflow by checking UIF bit in TIMx_SR, URS bit must be set correctly.
+
+* TODO Figure out why this basic calculation yields wrong result
+
+  uint32_t b  = (rcc_apb1_frequency * 2);
+
+* DONE Weird timings_ values
+prescaler 360:
+$96 = {796, 897, 118, 109, 118, 109, 118, 334, 118, 109, 112, 114, 118, 109, 113, 114, 113, 339, 118, 109, 118, 109, 112, 340, 113, 114, 113, 340, 113, 340, 113, 340, 118, 108, 118, 108, 112, 114, 118, 109, 118, 108, 118, 334, 113, 114, 117, 109, 113, 340, 113, 340, 117, 335, 112, 340, 113, 340, 113, 114, 112, 340, 113, 340, 113, 114, 113, 0 <repeats 33 times>}
+
+prescaler 180: 
+p timings_
+$92 = {577, 797, 235, 214, 235, 215, 225, 676, 234, 215, 235, 215, 235, 215, 234, 215, 224, 676, 235, 216, 234, 215, 225, 676, 234, 216, 224, 677, 225, 676, 224, 677, 234, 215, 235, 216, 234, 215, 235, 215, 235, 215, 224, 676, 235, 215, 235, 215, 224, 676, 224, 676, 224, 677, 224, 676, 224, 676, 235, 216, 224, 676, 224, 676, 235, 215, 224, 0 <repeats 33 times>}
+
+prescaler 100:
+$95 = {416, 200, 422, 384, 420, 384, 399, 212, 401, 404, 420, 384, 400, 405, 401, 403, 420, 191, 419, 387, 400, 405, 399, 212, 418, 386, 399, 211, 400, 211, 400, 211, 400, 405, 400, 406, 418, 386, 417, 386, 419, 384, 399, 211, 400, 404, 399, 405, 400, 210, 399, 211, 400, 212, 420, 190, 419, 194, 401, 405, 400, 210, 420, 192, 421, 384, 399, 0 <repeats 33 times>}
+
+Had not set period, so counter was looping to early.
+
+* TODO Synchronize Multiple interrupts and main thread.
+
+Use interrupt priorities.
+
+We have main thread and a number of interrupts:
+
+
+- input_ir exti input_handler
+- delay timer
+- output_ir timer
+
+- button exti
+  - select between input/output modes.
+    - only enable either:
+      - output_ir timer and delay timer or
+      - input_ir timer and delay timer
+
+set delay timer lower prio, can still be tail-chained
+
+delay timer can come first, then be preempted
+* TODO Button circuit
+10 buttons
+
+** direct conncetion: 10 gpio internal pulldown, 1 common high connection.
+*** TODO interrupt handling
+possible to use same isr for multiple gpios?
+
+Use exti1-10 for each button, one isr per button.
+
+
+debouncing: use general synchronization method, interrupt disabling.
+** Keypad
+** Swithes
+
+* TODO Hangs in constructor
+
+in statemachine.hpp:52
+          command_index_{0}, program_index_{program_index} {}
+      
+calls memcpy and hangs in loop 0x08004198-0x080041a2
+
+
+Dump of assembler code for function memcpy:
+   0x0800418a <+0>:	add	r2, r1
+;r0             0x200000d8          536871128
+;r1             0x200027e8          536881128
+;r2             0x20004fd4          536891348
+   0x0800418c <+2>:	cmp	r1, r2
+=> 0x0800418e <+4>:	add.w	r3, r0, #4294967295	; 0xffffffff destination address
+;r3             0x200000d7          536871127
+   0x08004192 <+8>:	bne.n	0x8004196 <memcpy+12>
+;r4             0x200000d8          536871128
+;lr             0x80019fd           134224381
+   0x08004194 <+10>:	bx	lr
+   0x08004196 <+12>:	push	{r4, lr}
+   0x08004198 <+14>:	ldrb.w	r4, [r1], #1 ;postincrement r1
+   0x0800419c <+18>:	cmp	r1, r2
+   0x0800419e <+20>:	strb.w	r4, [r3, #1]! ;preincrement r3
+   0x080041a2 <+24>:	bne.n	0x8004198 <memcpy+14>
+   0x080041a4 <+26>:	pop	{r4, pc}
+ 
+
+
+memcpy
+536891348-536881128
+10220 elements
+2*100*10*5
+
+does it fit in destination?
+;r3             0x200000d7          536871127
+536871127+10219=536881346=0x200028c2
+0x200000d7 - 0x200028c2 > 0x200027e8
+
+
+too many bytes?
+src,return addresses cause problems?
+
+
+hard_faults, CFSR == 0x20000
+user fault, invalid state. no idea why.
+
+(gdb) p/x pc
+$22 = 0x8001ae9
+ Uneven address???
+
+** Soloution
+Redesign, global variable, or pass around reference to common state instead of composition.
+
+global variable
+ + easy to implement
+ + can still change it in test
+ - hidden state 
+
+* interfaces summary
+ir in
+ir out
+buttons
+| type    | required ports |  Vdd [V] | Vss | Actual ports |
+|---------+----------------+----------+-----+--------------|
+| ir in   | 1 gpio         |      3.3 |     | B0           |
+|---------+----------------+----------+-----+--------------|
+| ir out  | 1 gpio TIM     |      3.3 |     | A0           |
+|---------+----------------+----------+-----+--------------|
+| buttons | 12 gpio ETXI   |      3.3 |     | A1-A12       |
+|---------+----------------+----------+-----+--------------|
+| screen  | scl            | 3.3 or 5 |     | PB6          |
+|         | sda            |          |     | PB7          |
+
+** Programs
+10 programs 0-9
+10 commands
+100 segments 16 bit (How are these stored? 32-bit aligned?)
+2*10e4B = 20 KiB -- Too Big!
+
+10KiB
+
+reduce array lengths
+
+
+* Constraints
+** Memory
+stm32f103c8t6
+
+SRAM 20KiB
+Flash 64KiB
