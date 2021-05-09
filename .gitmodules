@@ -1,9 +1,6 @@
 [submodule "libopencm3"]
 	path = libopencm3
 	url = https://github.com/libopencm3/libopencm3
-[submodule "etl"]
-	path = etl
-	url = https://github.com/ETLCPP/etl.git
 [submodule "googletest"]
 	path = googletest
 	url = https://github.com/google/googletest.git
