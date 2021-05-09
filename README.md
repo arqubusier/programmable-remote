@@ -1,18 +1,20 @@
-Easy "clone and go" repository for a libopencm3 based project.
+# Build using docker
 
-# Instructions
- 1. git clone --recurse-submodules https://github.com/libopencm3/libopencm3-template.git your-project
- 2. cd your-project
- 3. make -C libopencm3 # (Only needed once)
- 4. make -C my-project
+Build docker image like so:
 
-If you have an older git, or got ahead of yourself and skipped the ```--recurse-submodules```
-you can fix things by running ```git submodule update --init``` (This is only needed once)
+    $ docker build -t stm32-cpp-bare 
 
-# Directories
-* my-project contains your application
-* my-common-code contains something shared.
 
-# As a template
-You should replace this with your _own_ README if you are using this
-as a template.
+Run a container:
+
+    $ docker run -it --name stm32-cpp-bare -p 4444:4444 -v "$(pwd)/app":/usr/src/app --privileged -v /dev/bus/usb:/dev/bus/usb stm32-cpp-bare /bin/bash
+
+The project root directory on the host machine and "/usr/src/app" in the container can be used to share data.
+
+## Flashing
+
+In the container run:
+
+    $ openocd -f bluepill.cfg -c "program exe.elf verify reset exit"
+
+
