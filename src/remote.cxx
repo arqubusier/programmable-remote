@@ -6,6 +6,9 @@
 #include <array>
 
 #include "util_libopencm3.hpp"
+#include "boost/sml.hpp"
+
+namespace sml = boost::sml;
 
 // NOTE: there is an an error when calculating the prescaler value at
 // compile-time, therefore the calculation is performed manually.
@@ -112,7 +115,7 @@ void buttons_setup() {
     gpio_set_mode(button.port_, GPIO_MODE_INPUT, GPIO_CNF_INPUT_PULL_UPDOWN,
                   button.pin_);
     uint16_t odr = gpio_port_read(button.port_);
-    gpio_port_write(button.port_, odr | (1 << button.pin_));
+    gpio_port_write(button.port_, odr & ~(1 << button.pin_));
 
     nvic_enable_irq(exti);
     exti_select_source(exti, button.port_);
@@ -179,7 +182,27 @@ void exti0_isr(void) {
   //state_machine.send(STable::ReceiveToggle{});
 }
 
+
+struct press{};
+auto off = sml::state<class off>;
+auto on = sml::state<class on>;
+auto toggle = [] () {
+      gpio_toggle(led_ir.port, led_ir.pin);
+};
+
+struct StateMachine {
+  auto operator()() const {
+    return sml::make_transition_table(
+      *off + sml::event<press> / toggle = on
+      ,on  + sml::event<press> / toggle = off
+    );
+  }
+};
+
+sml::sm<StateMachine> state_machine{};
+
 void exti1_isr(void) {
+  state_machine.process_event(press{});
   exti_reset_request(EXTI1);
   //state_machine.send(STable::ButtonNumber{0});
 }
@@ -260,12 +283,16 @@ int main(void) {
 
    */
 
+  while (true) {
+  }
+  /*
   while (1) {
     gpio_toggle(led_ir.port, led_ir.pin);
     for (size_t i = 0; i < 8000000; i++) // Wait a bit.
       __asm__("nop");
     ;
   }
+  */
 
   return 0;
 }

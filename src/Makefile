@@ -14,6 +14,7 @@ LDFLAGS += -Wl,-Map=output.map
 VPATH += $(SHARED_DIR)
 INCLUDES += $(patsubst %,-I%, . $(SHARED_DIR))
 INCLUDES += -I../etl/include
+INCLUDES += -I../sml/include
 OPENCM3_DIR=../libopencm3
 
 include $(OPENCM3_DIR)/mk/genlink-config.mk
