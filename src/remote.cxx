@@ -3,9 +3,8 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/timer.h>
+#include <array>
 
-#include "ir.hpp"
-#include "statemachine.hpp"
 #include "util_libopencm3.hpp"
 
 // NOTE: there is an an error when calculating the prescaler value at
@@ -50,23 +49,6 @@ constexpr const util::io_t input_ir{GPIOA, GPIO1};
 constexpr const util::io_t led_ir{GPIOC, GPIO13};
 constexpr const util::io_t led_fail{GPIOA, GPIO2};
 
-InputHandler<hal::HwTag> input_handler{input_inter_segment_timer};
-OutputHandler<hal::HwTag> output_handler{output_inter_segment_timer,
-                                         output_carrier_timer};
-
-using STable = RemoteStateTable<hal::HwTag>;
-
-util::StateMachine<STable> state_machine{
-    std::in_place_type_t<STable::Sending>{},
-    STable::CommonState{
-        {{1, {67, {16197, 8671, 1234, 3147, 1249, 3127, 1258, 936,  1261, 932,
-                   1263,  928,  1256, 933,  1260, 931,  1256, 3119, 1260, 3116,
-                   1194,  1000, 1261, 3114, 1224, 970,  1248, 3124, 1217, 979,
-                   1261,  3113, 1262, 932,  1162, 1030, 1260, 3113, 1252, 943,
-                   1262,  3113, 1164, 3215, 1236, 958,  1261, 954,  1228, 3122,
-                   1217,  3161, 1261, 934,  1269, 3105, 1241, 953,  1228, 965,
-                   1257,  3119, 1260, 3118, 1263, 929,  1262}}}}},
-    0};
 
 /*
  * Setup
@@ -194,43 +176,45 @@ void usage_fault_handler(void) {
 
 void exti0_isr(void) {
   exti_reset_request(EXTI1);
-  state_machine.send(STable::ReceiveToggle{});
+  //state_machine.send(STable::ReceiveToggle{});
 }
 
 void exti1_isr(void) {
   exti_reset_request(EXTI1);
-  state_machine.send(STable::ButtonNumber{0});
+  //state_machine.send(STable::ButtonNumber{0});
 }
 
 void exti2_isr(void) {
   exti_reset_request(EXTI1);
-  state_machine.send(STable::ButtonNumber{1});
+  //state_machine.send(STable::ButtonNumber{1});
 }
 
 void exti3_isr(void) {
   exti_reset_request(EXTI1);
-  state_machine.send(STable::ButtonNumber{2});
+  //state_machine.send(STable::ButtonNumber{2});
 }
 
 void exti4_isr(void) {
   exti_reset_request(EXTI1);
-  state_machine.send(STable::ButtonNumber{3});
+  //state_machine.send(STable::ButtonNumber{3});
 }
 
 void exti9_5_isr(void) {
   exti_reset_request(EXTI1);
-  state_machine.send(STable::ButtonNumber{4});
+  //state_machine.send(STable::ButtonNumber{4});
 }
 
 void exti10_15_isr(void) {
   exti_reset_request(EXTI1);
-  state_machine.send(STable::ButtonNumber{5});
+  //state_machine.send(STable::ButtonNumber{5});
 }
 
-void tim3_isr(void) { state_machine.send(STable::SendNextSegment{}); }
+void tim3_isr(void) {
+  //state_machine.send(STable::SendNextSegment{});
+}
 
 void tim4_isr(void) {
-  state_machine.send(STable::SendNextSegment{});
+  //state_machine.send(STable::SendNextSegment{});
   // gpio_toggle(led_fail.port, led_fail.pin);
 }
 }
@@ -278,7 +262,7 @@ int main(void) {
 
   while (1) {
     gpio_toggle(led_ir.port, led_ir.pin);
-    for (size_t i = 0; i < 4000000; i++) // Wait a bit.
+    for (size_t i = 0; i < 8000000; i++) // Wait a bit.
       __asm__("nop");
     ;
   }
