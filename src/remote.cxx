@@ -10,6 +10,10 @@
 
 namespace sml = boost::sml;
 
+// Do not divide clock for highest possible resolution
+// Frequency is ABP1 clock * 2 = 72 MHz.
+// 1 period = 947 * (1/72MHz) = 13.15277... us <=> 76 KHz = 2*38 Khz
+util::Timer output_carrier_timer{TIM2, TIM_OC1, 0, 947};
 // NOTE: there is an an error when calculating the prescaler value at
 // compile-time, therefore the calculation is performed manually.
 uint32_t const inter_command_timer_freq = 100 * KILO;
@@ -27,10 +31,7 @@ util::Timer input_inter_segment_timer{
 util::Timer output_inter_segment_timer{
     TIM4, TIM_OC1, input_inter_segment_prescaler,
     util::ns2count(input_inter_segment_timer_freq, 24 * MEGA)};
-// Do not divide clock for highest possible resolution
-// Frequency is ABP1 clock * 2 = 72 MHz.
-// 1 period = 947 * (1/72MHz) = 13.15277... us <=> 76 KHz = 2*38 Khz
-util::Timer output_carrier_timer{TIM2, TIM_OC1, 0, 947};
+util::Timer const kDebounceTimer{TIM5, TIM_OC1, 3 - 1, 60000};
 
 // constexpr const util::io_t output_ir{GPIOA,GPIO8}; // TIM1 CH1 output
 constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
@@ -84,12 +85,12 @@ static void gpio_setup(void) {
   // Enable led as output
   gpio_set_mode(led_ir.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL,
                 led_ir.pin);
-  gpio_set(led_ir.port, led_ir.pin);
+  gpio_clear(led_ir.port, led_ir.pin);
 
   // Enable fail led as output
   gpio_set_mode(led_fail.port, GPIO_MODE_OUTPUT_50_MHZ,
                 GPIO_CNF_OUTPUT_PUSHPULL, led_fail.pin);
-  gpio_set(led_ir.port, led_ir.pin);
+  gpio_clear(led_fail.port, led_fail.pin);
 
   // carrier timer output compare value on pin, connect to ir led.
   gpio_set_mode(output_ir.port, GPIO_MODE_OUTPUT_50_MHZ,
@@ -124,10 +125,76 @@ void buttons_setup() {
   }
 }
 
+struct press{};
+auto off = sml::state<class off>;
+auto on = sml::state<class on>;
+auto toggle = [] () {
+      gpio_toggle(led_ir.port, led_ir.pin);
+};
+
+struct StateMachine {
+  auto operator()() const {
+    return sml::make_transition_table(
+      *off + sml::event<press> / toggle = on
+      ,on  + sml::event<press> / toggle = off
+    );
+  }
+};
+
+sml::sm<StateMachine> state_machine{};
+
+
+/**
+ * Configure the debounce timer.
+ */
+void debounce_setup() {
+    nvic_disable_irq(util::GetTimerIrqn(kDebounceTimer.tim_).first);
+    timer_disable_irq(kDebounceTimer.tim_, TIM_DIER_UIE);
+
+    rcc_periph_clock_enable(
+        util::GetTimerRccPeriphClken(kDebounceTimer.tim_).first);
+    // Reset timer peripheral to defaults.
+    rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(kDebounceTimer.tim_).first);
+
+    timer_disable_counter(kDebounceTimer.tim_);
+    timer_set_mode(kDebounceTimer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+    //timer_one_shot_mode(kDebounceTimer.tim_);
+    timer_continuous_mode(kDebounceTimer.tim_);
+    timer_enable_preload(kDebounceTimer.tim_);
+    timer_enable_update_event(kDebounceTimer.tim_);
+    timer_update_on_overflow(kDebounceTimer.tim_);
+    timer_set_prescaler(kDebounceTimer.tim_, kDebounceTimer.prescaler_);
+    timer_set_period(kDebounceTimer.tim_, kDebounceTimer.period_);
+    timer_generate_event(kDebounceTimer.tim_, TIM_EGR_UG);
+
+    timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
+    timer_enable_irq(kDebounceTimer.tim_, TIM_DIER_UIE);
+    nvic_enable_irq(util::GetTimerIrqn(kDebounceTimer.tim_).first);
+}
+
+/**
+ * Start debounce timer.
+ */
+void debounce_start() {
+    // Start at 1 to differentiate from 0 which is written when the timer finishes.
+    //timer_set_counter(kDebounceTimer.tim_, 1);
+    timer_set_counter(kDebounceTimer.tim_, 0);
+    timer_enable_counter(kDebounceTimer.tim_);
+}
+
+/**
+ * Return true if the debounce timer has expired.
+ */
+bool is_debounced() {
+    return timer_get_counter(kDebounceTimer.tim_) == 0;
+}
+
+
 /*
  * Isrs
  */
 extern "C" {
+
 void debug_hard_fault(uint32_t *stack) {
   volatile uint32_t icsr = SCB_ICSR;
   volatile uint32_t cfsr = SCB_CFSR;
@@ -183,26 +250,8 @@ void exti0_isr(void) {
 }
 
 
-struct press{};
-auto off = sml::state<class off>;
-auto on = sml::state<class on>;
-auto toggle = [] () {
-      gpio_toggle(led_ir.port, led_ir.pin);
-};
-
-struct StateMachine {
-  auto operator()() const {
-    return sml::make_transition_table(
-      *off + sml::event<press> / toggle = on
-      ,on  + sml::event<press> / toggle = off
-    );
-  }
-};
-
-sml::sm<StateMachine> state_machine{};
-
 void exti1_isr(void) {
-  state_machine.process_event(press{});
+  //state_machine.process_event(press{});
   exti_reset_request(EXTI1);
   //state_machine.send(STable::ButtonNumber{0});
 }
@@ -240,7 +289,16 @@ void tim4_isr(void) {
   //state_machine.send(STable::SendNextSegment{});
   // gpio_toggle(led_fail.port, led_fail.pin);
 }
+
+void tim5_isr(void) {
+    if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
+      //gpio_set(led_fail.port, led_fail.pin);
+      gpio_clear(led_ir.port, led_ir.pin);
+      timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
+    }
 }
+
+} // extern "C"
 
 // Normally used when calling destructors for global objects
 // Since we will never return from main it will be unused.
@@ -253,6 +311,22 @@ int main(void) {
   clock_setup();
   gpio_setup();
   buttons_setup();
+  debounce_setup();
+    
+  gpio_set(led_fail.port, led_fail.pin);
+    	//for (int i = 0; i < 5; i++) {
+    	//	__asm__("nop");
+    	//}
+  gpio_clear(led_fail.port, led_fail.pin);
+  gpio_clear(led_ir.port, led_ir.pin);
+  debounce_start();
+  while(1) {
+    	/* wait a little bit */
+    	for (int i = 0; i < 400000; i++) {
+    		__asm__("nop");
+    	}
+    	gpio_toggle(led_ir.port, led_ir.pin);
+  }
 
   // prescaler 36
   //{16213, 8792, 1142, 1052, 1097, 1096, 1091, 3306, 1141, 1053, 1143, 1048,
@@ -282,17 +356,6 @@ int main(void) {
     <repeats 33 times>}}, size_ = 67}
 
    */
-
-  while (true) {
-  }
-  /*
-  while (1) {
-    gpio_toggle(led_ir.port, led_ir.pin);
-    for (size_t i = 0; i < 8000000; i++) // Wait a bit.
-      __asm__("nop");
-    ;
-  }
-  */
 
   return 0;
 }

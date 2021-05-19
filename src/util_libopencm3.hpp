@@ -5,7 +5,7 @@
 #include <optional>
 #include <stdint.h>
 
-#include "etl/utility.h"
+#include <utility>
 #include "stm32f1_hal.hpp"
 
 constexpr const uint32_t GIGA = 1000000000;
@@ -23,7 +23,7 @@ namespace util {
 #endif
 
 #ifndef TEST
-constexpr etl::pair<rcc_periph_clken, bool>
+constexpr std::pair<rcc_periph_clken, bool>
 GetTimerRccPeriphClken(uint32_t tim) {
   switch (tim) {
   case TIM1:
@@ -38,7 +38,7 @@ GetTimerRccPeriphClken(uint32_t tim) {
   return {RCC_TIM1, false};
 }
 
-constexpr etl::pair<rcc_periph_rst, bool> GetTimerRccPeriphRst(uint32_t tim) {
+constexpr std::pair<rcc_periph_rst, bool> GetTimerRccPeriphRst(uint32_t tim) {
   switch (tim) {
   case TIM1:
     return {RST_TIM1, true};
@@ -52,7 +52,7 @@ constexpr etl::pair<rcc_periph_rst, bool> GetTimerRccPeriphRst(uint32_t tim) {
   return {RST_TIM4, false};
 }
 
-constexpr etl::pair<uint8_t, bool> GetTimerIrqn(uint32_t tim) {
+constexpr std::pair<uint8_t, bool> GetTimerIrqn(uint32_t tim) {
   switch (tim) {
   case TIM2:
     return {NVIC_TIM2_IRQ, true};

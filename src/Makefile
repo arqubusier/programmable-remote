@@ -6,14 +6,12 @@ CPPFILES = remote.cxx
 DEVICE = stm32f103C8T6
 OOCD_FILE = ./bluepill.cfg
 
-CXXFLAGS = -DNDEBUG -O0 -fno-exceptions -fno-rtti -std=c++17
+CXXFLAGS = -DNDEBUG -O0 -g -fno-exceptions -fno-rtti -std=c++17
 LDFLAGS += -Wl,-Map=output.map
 
 
-# You shouldn't have to edit anything below here.
 VPATH += $(SHARED_DIR)
 INCLUDES += $(patsubst %,-I%, . $(SHARED_DIR))
-INCLUDES += -I../etl/include
 INCLUDES += -I../sml/include
 OPENCM3_DIR=../libopencm3
 

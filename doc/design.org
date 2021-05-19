@@ -12,6 +12,37 @@ Timeout: assume time limit for section (burst or space)
 
 Limit on number of sections.
 
+** Clock
+
+Three sources: internal, external, pll. Pll uses internal or external as a source and can multiply the frequency.
+Max sysclock for internal is 36mHz, max for external is 72 MHz. 
+
+Default seems to be 36mHz -> internal?
+
+** Timers
+
+- carrier
+- inter segment (inter command)
+- debounce
+
+Total time = (counter*prescaler)/SYSCLK frequency
+prescaler = (total time*SYSCLK frequency)/countermax
+
+** Buttons
+
+0-9
+ok
+back
+
+bounce ca 5ms
+
+SYSCLK 18 mhz (?)   
+
+prescaler = 5ms *36MHz/65535 = 2.7...   
+
+set prescaler to 3 ->
+counter = 5ms * 36MHz/3 = 60'000
+
 
 *** Repeat message/multiple messages
 
