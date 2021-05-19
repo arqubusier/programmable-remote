@@ -351,3 +351,18 @@ stm32f103c8t6
 
 SRAM 20KiB
 Flash 64KiB
+
+* Problems
+** Following hangs
+
+using Buttons = std::array<util::Io, kNumButtons>;
+//global variable
+// note double outer braces
+// if single outer braces are used the problem disappears
+constexpr Buttons buttons{{
+    {GPIOA, GPIO1},
+}};
+
+for (const auto &button : buttons) {
+  uint32_t exti{util::GetExtiIrqn(button.pin_).value()};
+}

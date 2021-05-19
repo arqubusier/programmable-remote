@@ -31,27 +31,26 @@ util::Timer input_inter_segment_timer{
 util::Timer output_inter_segment_timer{
     TIM4, TIM_OC1, input_inter_segment_prescaler,
     util::ns2count(input_inter_segment_timer_freq, 24 * MEGA)};
-util::Timer const kDebounceTimer{TIM5, TIM_OC1, 3 - 1, 60000};
+util::Timer const kDebounceTimer{TIM3, TIM_OC1, 3 - 1, 60000};
 
 // constexpr const util::io_t output_ir{GPIOA,GPIO8}; // TIM1 CH1 output
 constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
 // constexpr const util::io_t output_ir{GPIOA,GPIO6}; // TIM3 CH1 output
 
-constexpr size_t kNumButtons{7};
+constexpr size_t kNumButtons{1};
 using Buttons = std::array<util::Io, kNumButtons>;
-constexpr Buttons buttons{{
+constexpr Buttons buttons{
     {GPIOA, GPIO1},
-    {GPIOA, GPIO2},
-    {GPIOA, GPIO3},
-    {GPIOA, GPIO4},
-    {GPIOA, GPIO5},
-    {GPIOA, GPIO11},
-    {GPIOA, GPIO12},
-}};
+    //{GPIOA, GPIO3},
+    //{GPIOA, GPIO4},
+    //{GPIOA, GPIO5},
+    //{GPIOA, GPIO11},
+    //{GPIOA, GPIO12},
+};
 
 constexpr const util::io_t input_ir{GPIOA, GPIO1};
-constexpr const util::io_t led_ir{GPIOC, GPIO13};
 constexpr const util::io_t led_fail{GPIOA, GPIO2};
+constexpr const util::io_t led_ir{GPIOC, GPIO13};
 
 
 /*
@@ -70,29 +69,25 @@ static void fault_setup(void) {
 static void clock_setup(void) {
   rcc_clock_setup_in_hse_8mhz_out_72mhz();
 
-  // Enable GPIO clock for leds.
-  rcc_periph_clock_enable(RCC_GPIOC);
-  // Enable GPIO clock for IR input.
-  rcc_periph_clock_enable(RCC_GPIOA);
-  // Enable GPIO clock for fail led.
-  rcc_periph_clock_enable(RCC_GPIOA);
-
   // Enable AFIO clock for timers.
   rcc_periph_clock_enable(RCC_AFIO);
 }
 
 static void gpio_setup(void) {
   // Enable led as output
+  rcc_periph_clock_enable(RCC_GPIOC);
   gpio_set_mode(led_ir.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL,
                 led_ir.pin);
   gpio_clear(led_ir.port, led_ir.pin);
 
   // Enable fail led as output
+  rcc_periph_clock_enable(RCC_GPIOA);
   gpio_set_mode(led_fail.port, GPIO_MODE_OUTPUT_50_MHZ,
                 GPIO_CNF_OUTPUT_PUSHPULL, led_fail.pin);
   gpio_clear(led_fail.port, led_fail.pin);
 
   // carrier timer output compare value on pin, connect to ir led.
+  rcc_periph_clock_enable(RCC_GPIOA);
   gpio_set_mode(output_ir.port, GPIO_MODE_OUTPUT_50_MHZ,
                 GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, output_ir.pin);
 
@@ -140,8 +135,6 @@ struct StateMachine {
     );
   }
 };
-
-sml::sm<StateMachine> state_machine{};
 
 
 /**
@@ -195,34 +188,6 @@ bool is_debounced() {
  */
 extern "C" {
 
-void debug_hard_fault(uint32_t *stack) {
-  volatile uint32_t icsr = SCB_ICSR;
-  volatile uint32_t cfsr = SCB_CFSR;
-  volatile uint32_t hfsr = SCB_HFSR;
-
-  volatile uint32_t r0 = stack[0];
-  volatile uint32_t r1 = stack[1];
-  volatile uint32_t r2 = stack[2];
-  volatile uint32_t r3 = stack[3];
-  volatile uint32_t r12 = stack[4];
-  volatile uint32_t lr = stack[5];
-  volatile uint32_t pc = stack[6];
-  volatile uint32_t psr = stack[7];
-
-  // hardware breakpoint
-  __asm volatile("BKPT #01");
-}
-
-void hard_fault_handler(void) {
-  __asm("MRS r0, MSP\n" // Default to the Main Stack Pointer
-        "MOV r1, lr\n"  // Load the current link register value
-        "MOVS r2, #4\n"
-        "TST r1, r2\n"           // Test whether we are in master or thread mode
-        "BEQ debug_hard_fault\n" // If in master mode, MSP is correct.
-        "MRS r0, PSP\n"        // If we weren't in master mode, load PSP instead
-        "B debug_hard_fault"); // Jump to the fault handler.
-}
-
 void mem_manage_handler(void) {
   volatile uint32_t cfsr = SCB_CFSR;
   volatile uint32_t mmfar = SCB_MMFAR;
@@ -246,54 +211,53 @@ void usage_fault_handler(void) {
 
 void exti0_isr(void) {
   exti_reset_request(EXTI1);
-  //state_machine.send(STable::ReceiveToggle{});
 }
 
 
 void exti1_isr(void) {
-  //state_machine.process_event(press{});
   exti_reset_request(EXTI1);
-  //state_machine.send(STable::ButtonNumber{0});
 }
 
 void exti2_isr(void) {
   exti_reset_request(EXTI1);
-  //state_machine.send(STable::ButtonNumber{1});
 }
 
 void exti3_isr(void) {
   exti_reset_request(EXTI1);
-  //state_machine.send(STable::ButtonNumber{2});
 }
 
 void exti4_isr(void) {
   exti_reset_request(EXTI1);
-  //state_machine.send(STable::ButtonNumber{3});
 }
 
 void exti9_5_isr(void) {
   exti_reset_request(EXTI1);
-  //state_machine.send(STable::ButtonNumber{4});
 }
 
 void exti10_15_isr(void) {
   exti_reset_request(EXTI1);
-  //state_machine.send(STable::ButtonNumber{5});
 }
 
 void tim3_isr(void) {
-  //state_machine.send(STable::SendNextSegment{});
+    if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
+      gpio_set(led_fail.port, led_fail.pin);
+      //gpio_clear(led_ir.port, led_ir.pin);
+      timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
+    }
 }
 
 void tim4_isr(void) {
-  //state_machine.send(STable::SendNextSegment{});
-  // gpio_toggle(led_fail.port, led_fail.pin);
+    if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
+      gpio_set(led_fail.port, led_fail.pin);
+      //gpio_clear(led_ir.port, led_ir.pin);
+      timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
+    }
 }
 
 void tim5_isr(void) {
     if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
-      //gpio_set(led_fail.port, led_fail.pin);
-      gpio_clear(led_ir.port, led_ir.pin);
+      gpio_set(led_fail.port, led_fail.pin);
+      //gpio_clear(led_ir.port, led_ir.pin);
       timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
     }
 }
@@ -312,13 +276,6 @@ int main(void) {
   gpio_setup();
   buttons_setup();
   debounce_setup();
-    
-  gpio_set(led_fail.port, led_fail.pin);
-    	//for (int i = 0; i < 5; i++) {
-    	//	__asm__("nop");
-    	//}
-  gpio_clear(led_fail.port, led_fail.pin);
-  gpio_clear(led_ir.port, led_ir.pin);
   debounce_start();
   while(1) {
     	/* wait a little bit */
@@ -327,35 +284,6 @@ int main(void) {
     	}
     	gpio_toggle(led_ir.port, led_ir.pin);
   }
-
-  // prescaler 36
-  //{16213, 8792, 1142, 1052, 1097, 1096, 1091, 3306, 1141, 1053, 1143, 1048,
-  // 1092, 1099, 1094, 1097, 1091, 3304, 1101, 1095, 1142, 1050, 1091, 3306,
-  // 1145, 1048, 1091, 3306, 1091, 3303, 1093, 3307, 1143, 1050, 1144, 1049,
-  // 1143, 1050, 1144, 1048, 1143, 1048, 1091, 3306, 1142, 1050, 1093, 1099,
-  // 1093, 3304, 1092, 3304, 1092, 3308, 1090, 3305, 1093, 3305, 1094, 1100,
-  // 1088, 3308, 1091, 3306, 1145, 1047, 1092};
-
-  /* Power projector
-  $1 = {static MAX_TIMING_LIMIT = 100, array_ = {_buffer = {16189, 8691, 1158,
-  3224, 1150, 3228, 1157, 1039, 1162, 1030, 1164, 1027, 1164, 1029, 1223, 970,
-  1221, 3153, 1150, 3229, 1223, 973, 1219, 3155, 1149, 1048, 1221, 3152, 1152,
-  1045, 1222, 3154, 1153, 1043, 1163, 1029, 1212, 982, 1222, 972, 1163, 1031,
-  1224, 3149, 1156, 1041, 1221, 971, 1223, 3154, 1226, 3153, 1162, 3217, 1148,
-  3232, 1163, 3217, 1156, 1040, 1163, 3213, 1148, 3232, 1161, 1035, 1162, 0
-  <repeats 33 times>}}, size_ = 67}
-  */
-
-  /* projector menu
-    $2 = {static MAX_TIMING_LIMIT = 100, array_ = {_buffer = {16197, 8671, 1234,
-    3147, 1249, 3127, 1258, 936, 1261, 932, 1263, 928, 1256, 933, 1260, 931,
-    1256, 3119, 1260, 3116, 1194, 1000, 1261, 3114, 1224, 970, 1248, 3124, 1217,
-    979, 1261, 3113, 1262, 932, 1162, 1030, 1260, 3113, 1252, 943, 1262, 3113,
-    1164, 3215, 1236, 958, 1261, 954, 1228, 3122, 1217, 3161, 1261, 934, 1269,
-    3105, 1241, 953, 1228, 965, 1257, 3119, 1260, 3118, 1263, 929, 1262, 0
-    <repeats 33 times>}}, size_ = 67}
-
-   */
 
   return 0;
 }
