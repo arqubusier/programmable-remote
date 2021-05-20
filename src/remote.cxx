@@ -31,7 +31,7 @@ util::Timer input_inter_segment_timer{
 util::Timer output_inter_segment_timer{
     TIM4, TIM_OC1, input_inter_segment_prescaler,
     util::ns2count(input_inter_segment_timer_freq, 24 * MEGA)};
-util::Timer const kDebounceTimer{TIM3, TIM_OC1, 3 - 1, 60000};
+util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
 // constexpr const util::io_t output_ir{GPIOA,GPIO8}; // TIM1 CH1 output
 constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
@@ -146,8 +146,7 @@ void debounce_setup() {
   timer_disable_counter(kDebounceTimer.tim_);
   timer_set_mode(kDebounceTimer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                  TIM_CR1_DIR_UP);
-  // timer_one_shot_mode(kDebounceTimer.tim_);
-  timer_continuous_mode(kDebounceTimer.tim_);
+  timer_one_shot_mode(kDebounceTimer.tim_);
   timer_enable_preload(kDebounceTimer.tim_);
   timer_enable_update_event(kDebounceTimer.tim_);
   timer_update_on_overflow(kDebounceTimer.tim_);
@@ -218,8 +217,7 @@ void exti10_15_isr(void) { exti_reset_request(EXTI1); }
 
 void tim3_isr(void) {
   if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
-    gpio_set(led_fail.port, led_fail.pin);
-    // gpio_clear(led_ir.port, led_ir.pin);
+    gpio_toggle(led_fail.port, led_fail.pin);
     timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
   }
 }
@@ -254,13 +252,14 @@ int main(void) {
   gpio_setup();
   buttons_setup();
   debounce_setup();
-  debounce_start();
   while (1) {
     /* wait a little bit */
     for (int i = 0; i < 400000; i++) {
       __asm__("nop");
     }
     gpio_toggle(led_ir.port, led_ir.pin);
+    gpio_toggle(led_fail.port, led_fail.pin);
+    debounce_start();
   }
 
   return 0;

@@ -36,12 +36,12 @@ back
 
 bounce ca 5ms
 
-SYSCLK 18 mhz (?)   
+SYSCLK 36 mhz (?)   
 
-prescaler = 5ms *36MHz/65535 = 2.7...   
+prescaler = 5ms * 72 MHz/65535 = 5.4...   
 
-set prescaler to 3 ->
-counter = 5ms * 36MHz/3 = 60'000
+set prescaler to 6 ->
+counter = 5ms * 72 MHz/6 = 60'000
 
 
 *** Repeat message/multiple messages
