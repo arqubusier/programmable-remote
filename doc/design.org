@@ -366,3 +366,7 @@ constexpr Buttons buttons{{
 for (const auto &button : buttons) {
   uint32_t exti{util::GetExtiIrqn(button.pin_).value()};
 }
+
+** Debounce timer works for tim3 but not tim5
+
+commit 8a56048e89eca8753037eba329801153a9f771ca

@@ -8,12 +8,12 @@ git clone  --recurse-submodules git@github.com:arqubusier/programmable-remote.gi
 
 Build docker image like so:
 
-    $ docker build -t stm32-cpp-bare 
+    $ docker build -t stm32-cpp-bare .
 
 
 Run the container:
 
-    $ docker run -it --name stm32-cpp-bare -p 4444:4444 -v "$(pwd)/app":/usr/src/app --privileged -v /dev/bus/usb:/dev/bus/usb stm32-cpp-bare /bin/bash
+    $ docker run -it --name stm32-cpp-bare -p 4444:4444 -v "$(pwd)":/usr/src/app --privileged -v /dev/bus/usb:/dev/bus/usb stm32-cpp-bare /bin/bash
 
 If you stop the container, you can start it again with:
 
@@ -41,3 +41,7 @@ In the container run:
   root@mycontainer $ openocd -f bluepill.cfg -c "program src/programmable-remote.elf verify reset exit"
 
 
+## Generate compile_commands.json
+
+  $ make -C src clean
+  $ bear make -C src
