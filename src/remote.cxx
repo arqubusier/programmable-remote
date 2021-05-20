@@ -1,12 +1,12 @@
+#include <array>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/exti.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/timer.h>
-#include <array>
 
-#include "util_libopencm3.hpp"
 #include "boost/sml.hpp"
+#include "util_libopencm3.hpp"
 
 namespace sml = boost::sml;
 
@@ -51,7 +51,6 @@ constexpr Buttons buttons{
 constexpr const util::io_t input_ir{GPIOA, GPIO1};
 constexpr const util::io_t led_fail{GPIOA, GPIO2};
 constexpr const util::io_t led_ir{GPIOC, GPIO13};
-
 
 /*
  * Setup
@@ -120,68 +119,62 @@ void buttons_setup() {
   }
 }
 
-struct press{};
+struct press {};
 auto off = sml::state<class off>;
 auto on = sml::state<class on>;
-auto toggle = [] () {
-      gpio_toggle(led_ir.port, led_ir.pin);
-};
+auto toggle = []() { gpio_toggle(led_ir.port, led_ir.pin); };
 
 struct StateMachine {
   auto operator()() const {
-    return sml::make_transition_table(
-      *off + sml::event<press> / toggle = on
-      ,on  + sml::event<press> / toggle = off
-    );
+    return sml::make_transition_table(*off + sml::event<press> / toggle = on,
+                                      on + sml::event<press> / toggle = off);
   }
 };
-
 
 /**
  * Configure the debounce timer.
  */
 void debounce_setup() {
-    nvic_disable_irq(util::GetTimerIrqn(kDebounceTimer.tim_).first);
-    timer_disable_irq(kDebounceTimer.tim_, TIM_DIER_UIE);
+  nvic_disable_irq(util::GetTimerIrqn(kDebounceTimer.tim_).first);
+  timer_disable_irq(kDebounceTimer.tim_, TIM_DIER_UIE);
 
-    rcc_periph_clock_enable(
-        util::GetTimerRccPeriphClken(kDebounceTimer.tim_).first);
-    // Reset timer peripheral to defaults.
-    rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(kDebounceTimer.tim_).first);
+  rcc_periph_clock_enable(
+      util::GetTimerRccPeriphClken(kDebounceTimer.tim_).first);
+  // Reset timer peripheral to defaults.
+  rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(kDebounceTimer.tim_).first);
 
-    timer_disable_counter(kDebounceTimer.tim_);
-    timer_set_mode(kDebounceTimer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
-    //timer_one_shot_mode(kDebounceTimer.tim_);
-    timer_continuous_mode(kDebounceTimer.tim_);
-    timer_enable_preload(kDebounceTimer.tim_);
-    timer_enable_update_event(kDebounceTimer.tim_);
-    timer_update_on_overflow(kDebounceTimer.tim_);
-    timer_set_prescaler(kDebounceTimer.tim_, kDebounceTimer.prescaler_);
-    timer_set_period(kDebounceTimer.tim_, kDebounceTimer.period_);
-    timer_generate_event(kDebounceTimer.tim_, TIM_EGR_UG);
+  timer_disable_counter(kDebounceTimer.tim_);
+  timer_set_mode(kDebounceTimer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
+                 TIM_CR1_DIR_UP);
+  // timer_one_shot_mode(kDebounceTimer.tim_);
+  timer_continuous_mode(kDebounceTimer.tim_);
+  timer_enable_preload(kDebounceTimer.tim_);
+  timer_enable_update_event(kDebounceTimer.tim_);
+  timer_update_on_overflow(kDebounceTimer.tim_);
+  timer_set_prescaler(kDebounceTimer.tim_, kDebounceTimer.prescaler_);
+  timer_set_period(kDebounceTimer.tim_, kDebounceTimer.period_);
+  timer_generate_event(kDebounceTimer.tim_, TIM_EGR_UG);
 
-    timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
-    timer_enable_irq(kDebounceTimer.tim_, TIM_DIER_UIE);
-    nvic_enable_irq(util::GetTimerIrqn(kDebounceTimer.tim_).first);
+  timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
+  timer_enable_irq(kDebounceTimer.tim_, TIM_DIER_UIE);
+  nvic_enable_irq(util::GetTimerIrqn(kDebounceTimer.tim_).first);
 }
 
 /**
  * Start debounce timer.
  */
 void debounce_start() {
-    // Start at 1 to differentiate from 0 which is written when the timer finishes.
-    //timer_set_counter(kDebounceTimer.tim_, 1);
-    timer_set_counter(kDebounceTimer.tim_, 0);
-    timer_enable_counter(kDebounceTimer.tim_);
+  // Start at 1 to differentiate from 0 which is written when the timer
+  // finishes.
+  // timer_set_counter(kDebounceTimer.tim_, 1);
+  timer_set_counter(kDebounceTimer.tim_, 0);
+  timer_enable_counter(kDebounceTimer.tim_);
 }
 
 /**
  * Return true if the debounce timer has expired.
  */
-bool is_debounced() {
-    return timer_get_counter(kDebounceTimer.tim_) == 0;
-}
-
+bool is_debounced() { return timer_get_counter(kDebounceTimer.tim_) == 0; }
 
 /*
  * Isrs
@@ -209,57 +202,42 @@ void usage_fault_handler(void) {
   }
 }
 
-void exti0_isr(void) {
-  exti_reset_request(EXTI1);
-}
+void exti0_isr(void) { exti_reset_request(EXTI1); }
 
+void exti1_isr(void) { exti_reset_request(EXTI1); }
 
-void exti1_isr(void) {
-  exti_reset_request(EXTI1);
-}
+void exti2_isr(void) { exti_reset_request(EXTI1); }
 
-void exti2_isr(void) {
-  exti_reset_request(EXTI1);
-}
+void exti3_isr(void) { exti_reset_request(EXTI1); }
 
-void exti3_isr(void) {
-  exti_reset_request(EXTI1);
-}
+void exti4_isr(void) { exti_reset_request(EXTI1); }
 
-void exti4_isr(void) {
-  exti_reset_request(EXTI1);
-}
+void exti9_5_isr(void) { exti_reset_request(EXTI1); }
 
-void exti9_5_isr(void) {
-  exti_reset_request(EXTI1);
-}
-
-void exti10_15_isr(void) {
-  exti_reset_request(EXTI1);
-}
+void exti10_15_isr(void) { exti_reset_request(EXTI1); }
 
 void tim3_isr(void) {
-    if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
-      gpio_set(led_fail.port, led_fail.pin);
-      //gpio_clear(led_ir.port, led_ir.pin);
-      timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
-    }
+  if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
+    gpio_set(led_fail.port, led_fail.pin);
+    // gpio_clear(led_ir.port, led_ir.pin);
+    timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
+  }
 }
 
 void tim4_isr(void) {
-    if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
-      gpio_set(led_fail.port, led_fail.pin);
-      //gpio_clear(led_ir.port, led_ir.pin);
-      timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
-    }
+  if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
+    gpio_set(led_fail.port, led_fail.pin);
+    // gpio_clear(led_ir.port, led_ir.pin);
+    timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
+  }
 }
 
 void tim5_isr(void) {
-    if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
-      gpio_set(led_fail.port, led_fail.pin);
-      //gpio_clear(led_ir.port, led_ir.pin);
-      timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
-    }
+  if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
+    gpio_set(led_fail.port, led_fail.pin);
+    // gpio_clear(led_ir.port, led_ir.pin);
+    timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
+  }
 }
 
 } // extern "C"
@@ -277,14 +255,13 @@ int main(void) {
   buttons_setup();
   debounce_setup();
   debounce_start();
-  while(1) {
-    	/* wait a little bit */
-    	for (int i = 0; i < 400000; i++) {
-    		__asm__("nop");
-    	}
-    	gpio_toggle(led_ir.port, led_ir.pin);
+  while (1) {
+    /* wait a little bit */
+    for (int i = 0; i < 400000; i++) {
+      __asm__("nop");
+    }
+    gpio_toggle(led_ir.port, led_ir.pin);
   }
 
   return 0;
 }
-

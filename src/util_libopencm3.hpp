@@ -5,8 +5,8 @@
 #include <optional>
 #include <stdint.h>
 
-#include <utility>
 #include "stm32f1_hal.hpp"
+#include <utility>
 
 constexpr const uint32_t GIGA = 1000000000;
 constexpr const uint32_t MEGA = 1000000;
