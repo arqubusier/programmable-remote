@@ -1,0 +1,21 @@
+\" Build with: $ groff -Tpdf -p doc/debounce.troff > doc/debounce.pdf
+.PS
+upDownSep = 4
+Up: ellipse "Up"
+Down: ellipse with .w at Up.e + (upDownSep, 0) "Down"
+BouncingDown: ellipse wid 1.2 with .n at Up.e + (upDownSep/2, 1) "BouncingDown"
+BouncingUp: ellipse wid 1.2 with .s at Up.e + (upDownSep/2, -1) "BouncingUp"
+
+Up2BouncingDown: arc -> cw from Up.n to BouncingDown.w rad 3
+"Edge / Start timer" at (Up, BouncingDown.w)
+BouncingUp2Up: arc -> cw from BouncingUp.w to Up.s rad 3
+"timeout [read(button)==up]" at (Up, BouncingUp.w)
+BouncingDown2Down: arc -> cw from BouncingDown.e to Down.n rad 3
+"timeout [read(button)==down]" at (Down, BouncingDown.e)
+Down2BouncingUp: arc -> cw from Down.s to BouncingUp.e rad 3
+"Edge / Start timer" at (Down, BouncingUp.e)
+BouncingDown2BouncingUp: arrow cw from BouncingDown.se to BouncingUp.ne
+"timeout" ljust "[read(button)==up]" ljust at .5 <BouncingDown, BouncingUp> + (.5, 0)
+BouncingUp2BouncingDown: arrow cw from BouncingUp.nw to BouncingDown.sw
+"timeout" rjust "[read(button)==down]" rjust at .5 <BouncingDown, BouncingUp> + (-.5, 0)
+.PE
