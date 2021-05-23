@@ -1,13 +1,19 @@
 #include <array>
+#include <cstdint>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/exti.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/timer.h>
+#include <optional>
+#include <variant>
 
 #include "boost/sml.hpp"
 #include "util_libopencm3.hpp"
 
+enum struct ButtonState { kUp, kBouncingDown, kBouncingUp, kDown };
+
+enum struct ButtonUpMask : std::uint16_t { kUp = 0, kDown = 0xFFFF };
 namespace sml = boost::sml;
 
 // Do not divide clock for highest possible resolution
@@ -38,19 +44,21 @@ constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
 // constexpr const util::io_t output_ir{GPIOA,GPIO6}; // TIM3 CH1 output
 
 constexpr size_t kNumButtons{1};
-using Buttons = std::array<util::Io, kNumButtons>;
-constexpr Buttons buttons{
-    {GPIOA, GPIO1},
-    //{GPIOA, GPIO3},
-    //{GPIOA, GPIO4},
-    //{GPIOA, GPIO5},
-    //{GPIOA, GPIO11},
-    //{GPIOA, GPIO12},
+struct Button {
+  util::Io io;
+  ButtonState state;
 };
+Button button1{{GPIOA, GPIO1}, ButtonState::kUp};
+using Buttons = std::array<Button, kNumButtons>;
+Buttons buttons{Button{{GPIOA, GPIO1}, ButtonState::kUp}};
 
 constexpr const util::io_t input_ir{GPIOA, GPIO1};
 constexpr const util::io_t led_fail{GPIOA, GPIO2};
 constexpr const util::io_t led_ir{GPIOC, GPIO13};
+
+bool IsButtonDown(std::uint16_t val) { return val & 0xFFFF; }
+
+bool IsButtonUp(std::uint16_t val) { return !val; }
 
 /*
  * Setup
@@ -106,30 +114,36 @@ static void gpio_setup(void) {
  */
 void buttons_setup() {
   for (const auto &button : buttons) {
-    uint32_t exti{util::GetExtiIrqn(button.pin_).value()};
-    gpio_set_mode(button.port_, GPIO_MODE_INPUT, GPIO_CNF_INPUT_PULL_UPDOWN,
-                  button.pin_);
-    uint16_t odr = gpio_port_read(button.port_);
-    gpio_port_write(button.port_, odr & ~(1 << button.pin_));
+    uint32_t exti{util::GetExtiIrqn(button.io.pin_).value()};
+    gpio_set_mode(button.io.port_, GPIO_MODE_INPUT, GPIO_CNF_INPUT_PULL_UPDOWN,
+                  button.io.pin_);
+    uint16_t odr = gpio_port_read(button.io.port_);
+    gpio_port_write(button.io.port_, odr & ~(1 << button.io.pin_));
 
     nvic_enable_irq(exti);
-    exti_select_source(exti, button.port_);
+    exti_select_source(exti, button.io.port_);
     exti_set_trigger(exti, EXTI_TRIGGER_RISING);
     exti_enable_request(exti);
   }
 }
 
-struct press {};
+struct ButtonPressed {};
+struct ButtonReleased {};
+struct NoEvent {};
 auto off = sml::state<class off>;
 auto on = sml::state<class on>;
 auto toggle = []() { gpio_toggle(led_ir.port, led_ir.pin); };
 
-struct StateMachine {
+struct RemoteStateTable {
   auto operator()() const {
-    return sml::make_transition_table(*off + sml::event<press> / toggle = on,
-                                      on + sml::event<press> / toggle = off);
+    return sml::make_transition_table(
+        *off + sml::event<ButtonPressed> / toggle = on,
+        on + sml::event<ButtonPressed> / toggle = off);
   }
 };
+
+using RemoteState = sml::sm<RemoteStateTable>;
+RemoteState g_remote_state{};
 
 /**
  * Configure the debounce timer.
@@ -153,27 +167,63 @@ void debounce_setup() {
   timer_set_prescaler(kDebounceTimer.tim_, kDebounceTimer.prescaler_);
   timer_set_period(kDebounceTimer.tim_, kDebounceTimer.period_);
   timer_generate_event(kDebounceTimer.tim_, TIM_EGR_UG);
-
-  timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
-  timer_enable_irq(kDebounceTimer.tim_, TIM_DIER_UIE);
-  nvic_enable_irq(util::GetTimerIrqn(kDebounceTimer.tim_).first);
 }
 
 /**
- * Start debounce timer.
+ * Start debounce timer and wait until it completes.
  */
-void debounce_start() {
-  // Start at 1 to differentiate from 0 which is written when the timer
-  // finishes.
-  // timer_set_counter(kDebounceTimer.tim_, 1);
+void debounce_delay_block() {
   timer_set_counter(kDebounceTimer.tim_, 0);
   timer_enable_counter(kDebounceTimer.tim_);
+  while (TIM_CR1(kDebounceTimer.tim_) & TIM_CR1_CEN) {
+    ; // do nothing
+  }
 }
 
+using ButtonEvent = std::variant<ButtonPressed, ButtonReleased, NoEvent>;
 /**
- * Return true if the debounce timer has expired.
+ * Update a button state given an rising or falling edge for it and send a
+ * button events if applicable.
  */
-bool is_debounced() { return timer_get_counter(kDebounceTimer.tim_) == 0; }
+void ProcessButton(Button &button, RemoteState &remote_state) {
+
+  switch (button.state) {
+  case ButtonState::kUp:
+    remote_state.process_event(ButtonPressed{});
+    button.state = ButtonState::kBouncingDown;
+    break;
+  case ButtonState::kDown:
+    remote_state.process_event(ButtonReleased{});
+    button.state = ButtonState::kBouncingUp;
+    break;
+  default:; // do nothing
+  }
+
+  while (true) {
+    switch (button.state) {
+    case ButtonState::kBouncingDown:
+      debounce_delay_block();
+      if (IsButtonUp(gpio_get(button.io.port_, button.io.pin_))) {
+        button.state = ButtonState::kDown;
+      } else {
+        remote_state.process_event(ButtonReleased{});
+        button.state = ButtonState::kBouncingUp;
+      }
+    case ButtonState::kBouncingUp:
+      debounce_delay_block();
+      if (IsButtonDown(gpio_get(button.io.port_, button.io.pin_))) {
+        button.state = ButtonState::kUp;
+      } else {
+        remote_state.process_event(ButtonPressed{});
+        button.state = ButtonState::kBouncingDown;
+      }
+    case ButtonState::kUp:
+    case ButtonState::kDown:
+    default:
+      break;
+    }
+  }
+}
 
 /*
  * Isrs
@@ -201,7 +251,10 @@ void usage_fault_handler(void) {
   }
 }
 
-void exti0_isr(void) { exti_reset_request(EXTI1); }
+void exti0_isr(void) {
+  ProcessButton(buttons[0], g_remote_state);
+  exti_reset_request(EXTI1);
+}
 
 void exti1_isr(void) { exti_reset_request(EXTI1); }
 
@@ -215,28 +268,9 @@ void exti9_5_isr(void) { exti_reset_request(EXTI1); }
 
 void exti10_15_isr(void) { exti_reset_request(EXTI1); }
 
-void tim3_isr(void) {
-  if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
-    gpio_toggle(led_fail.port, led_fail.pin);
-    timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
-  }
-}
+void tim3_isr(void) {}
 
-void tim4_isr(void) {
-  if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
-    gpio_set(led_fail.port, led_fail.pin);
-    // gpio_clear(led_ir.port, led_ir.pin);
-    timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
-  }
-}
-
-void tim5_isr(void) {
-  if (timer_get_flag(kDebounceTimer.tim_, TIM_SR_UIF)) {
-    gpio_set(led_fail.port, led_fail.pin);
-    // gpio_clear(led_ir.port, led_ir.pin);
-    timer_clear_flag(kDebounceTimer.tim_, TIM_SR_UIF);
-  }
-}
+void tim4_isr(void) {}
 
 } // extern "C"
 
@@ -257,9 +291,7 @@ int main(void) {
     for (int i = 0; i < 400000; i++) {
       __asm__("nop");
     }
-    gpio_toggle(led_ir.port, led_ir.pin);
     gpio_toggle(led_fail.port, led_fail.pin);
-    debounce_start();
   }
 
   return 0;
