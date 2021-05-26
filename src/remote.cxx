@@ -48,13 +48,13 @@ struct Button {
   util::Io io;
   ButtonState state;
 };
-Button button1{{GPIOA, GPIO1}, ButtonState::kUp};
 using Buttons = std::array<Button, kNumButtons>;
-Buttons buttons{Button{{GPIOA, GPIO1}, ButtonState::kUp}};
+Buttons buttons{Button{{GPIOA, GPIO3}, ButtonState::kUp}};
 
 constexpr const util::io_t input_ir{GPIOA, GPIO1};
 constexpr const util::io_t led_fail{GPIOA, GPIO2};
 constexpr const util::io_t led_ir{GPIOC, GPIO13};
+constexpr const util::io_t led_status{GPIOC, GPIO13};
 
 bool IsButtonDown(std::uint16_t val) { return val & 0xFFFF; }
 
@@ -83,9 +83,9 @@ static void clock_setup(void) {
 static void gpio_setup(void) {
   // Enable led as output
   rcc_periph_clock_enable(RCC_GPIOC);
-  gpio_set_mode(led_ir.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL,
-                led_ir.pin);
-  gpio_clear(led_ir.port, led_ir.pin);
+  gpio_set_mode(led_status.port, GPIO_MODE_OUTPUT_50_MHZ,
+                GPIO_CNF_OUTPUT_PUSHPULL, led_status.pin);
+  gpio_clear(led_status.port, led_status.pin);
 
   // Enable fail led as output
   rcc_periph_clock_enable(RCC_GPIOA);
@@ -122,7 +122,7 @@ void buttons_setup() {
 
     nvic_enable_irq(exti);
     exti_select_source(exti, button.io.port_);
-    exti_set_trigger(exti, EXTI_TRIGGER_RISING);
+    exti_set_trigger(exti, EXTI_TRIGGER_BOTH);
     exti_enable_request(exti);
   }
 }
@@ -132,7 +132,7 @@ struct ButtonReleased {};
 struct NoEvent {};
 auto off = sml::state<class off>;
 auto on = sml::state<class on>;
-auto toggle = []() { gpio_toggle(led_ir.port, led_ir.pin); };
+auto toggle = []() { gpio_toggle(led_status.port, led_status.pin); };
 
 struct RemoteStateTable {
   auto operator()() const {
@@ -170,14 +170,23 @@ void debounce_setup() {
 }
 
 /**
- * Start debounce timer and wait until it completes.
+ * Start debounce timer and wait for it, discarding interrupts for a button.
+ *
+ * The button interrupts are discarded to prevent multiple detected presses due
+ * to bouncing.
  */
-void debounce_delay_block() {
+void debounce_delay_block(Button &button) {
+  uint32_t exti{util::GetExtiIrqn(button.io.pin_).value()};
+  exti_enable_request(exti);
+  exti_reset_request(exti);
+
   timer_set_counter(kDebounceTimer.tim_, 0);
   timer_enable_counter(kDebounceTimer.tim_);
   while (TIM_CR1(kDebounceTimer.tim_) & TIM_CR1_CEN) {
     ; // do nothing
   }
+
+  exti_enable_request(exti);
 }
 
 using ButtonEvent = std::variant<ButtonPressed, ButtonReleased, NoEvent>;
@@ -186,6 +195,8 @@ using ButtonEvent = std::variant<ButtonPressed, ButtonReleased, NoEvent>;
  * button events if applicable.
  */
 void ProcessButton(Button &button, RemoteState &remote_state) {
+
+  // gpio_toggle(led_status.port, led_status.pin);
 
   switch (button.state) {
   case ButtonState::kUp:
@@ -202,7 +213,7 @@ void ProcessButton(Button &button, RemoteState &remote_state) {
   while (true) {
     switch (button.state) {
     case ButtonState::kBouncingDown:
-      debounce_delay_block();
+      debounce_delay_block(button);
       if (IsButtonUp(gpio_get(button.io.port_, button.io.pin_))) {
         button.state = ButtonState::kDown;
       } else {
@@ -210,7 +221,7 @@ void ProcessButton(Button &button, RemoteState &remote_state) {
         button.state = ButtonState::kBouncingUp;
       }
     case ButtonState::kBouncingUp:
-      debounce_delay_block();
+      debounce_delay_block(button);
       if (IsButtonDown(gpio_get(button.io.port_, button.io.pin_))) {
         button.state = ButtonState::kUp;
       } else {
@@ -251,16 +262,13 @@ void usage_fault_handler(void) {
   }
 }
 
-void exti0_isr(void) {
-  ProcessButton(buttons[0], g_remote_state);
-  exti_reset_request(EXTI1);
-}
+void exti0_isr(void) { ProcessButton(buttons[0], g_remote_state); }
 
 void exti1_isr(void) { exti_reset_request(EXTI1); }
 
 void exti2_isr(void) { exti_reset_request(EXTI1); }
 
-void exti3_isr(void) { exti_reset_request(EXTI1); }
+void exti3_isr(void) { ProcessButton(buttons[0], g_remote_state); }
 
 void exti4_isr(void) { exti_reset_request(EXTI1); }
 
@@ -291,7 +299,7 @@ int main(void) {
     for (int i = 0; i < 400000; i++) {
       __asm__("nop");
     }
-    gpio_toggle(led_fail.port, led_fail.pin);
+    // gpio_toggle(led_status.port, led_status.pin);
   }
 
   return 0;
