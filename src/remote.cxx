@@ -5,6 +5,7 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/timer.h>
+#include <libopencm3/stm32/usart.h>
 #include <optional>
 #include <variant>
 
@@ -39,6 +40,8 @@ util::Timer output_inter_segment_timer{
     util::ns2count(input_inter_segment_timer_freq, 24 * MEGA)};
 util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
+std::uint32_t const kUsartBaud{2400};
+
 // constexpr const util::io_t output_ir{GPIOA,GPIO8}; // TIM1 CH1 output
 constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
 // constexpr const util::io_t output_ir{GPIOA,GPIO6}; // TIM3 CH1 output
@@ -52,9 +55,10 @@ using Buttons = std::array<Button, kNumButtons>;
 Buttons buttons{Button{{GPIOA, GPIO3}, ButtonState::kUp}};
 
 constexpr const util::io_t input_ir{GPIOA, GPIO1};
-constexpr const util::io_t led_fail{GPIOA, GPIO2};
+constexpr const util::io_t led_fail{GPIOA, GPIO5};
 constexpr const util::io_t led_ir{GPIOC, GPIO13};
 constexpr const util::io_t led_status{GPIOC, GPIO13};
+constexpr const util::io_t usart_io{GPIOA, GPIO2};
 
 bool IsButtonDown(std::uint16_t val) { return val & 0xFFFF; }
 
@@ -125,6 +129,26 @@ void buttons_setup() {
     exti_set_trigger(exti, EXTI_TRIGGER_BOTH);
     exti_enable_request(exti);
   }
+}
+
+void usart_setup() {
+  rcc_periph_clock_enable(RCC_GPIOA);
+
+  rcc_periph_clock_enable(RCC_USART2);
+  // Setup GPIO pin GPIO_USART2_TX.
+  gpio_set_mode(usart_io.port, GPIO_MODE_OUTPUT_50_MHZ,
+                GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, usart_io.pin);
+
+  // Setup UART parameters.
+  usart_set_baudrate(USART2, 115200);
+  usart_set_databits(USART2, 8);
+  usart_set_stopbits(USART2, USART_STOPBITS_1);
+  usart_set_mode(USART2, USART_MODE_TX);
+  usart_set_parity(USART2, USART_PARITY_NONE);
+  usart_set_flow_control(USART2, USART_FLOWCONTROL_NONE);
+
+  // Finally enable the USART.
+  usart_enable(USART2);
 }
 
 struct ButtonPressed {};
@@ -291,6 +315,7 @@ void *__dso_handle = nullptr;
 int main(void) {
   fault_setup();
   clock_setup();
+  usart_setup();
   gpio_setup();
   buttons_setup();
   debounce_setup();
@@ -299,7 +324,8 @@ int main(void) {
     for (int i = 0; i < 400000; i++) {
       __asm__("nop");
     }
-    // gpio_toggle(led_status.port, led_status.pin);
+    usart_send(USART2, 'h');
+    gpio_toggle(led_status.port, led_status.pin);
   }
 
   return 0;
