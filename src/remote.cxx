@@ -201,7 +201,7 @@ void debounce_setup() {
  */
 void debounce_delay_block(Button &button) {
   uint32_t exti{util::GetExtiIrqn(button.io.pin_).value()};
-  exti_enable_request(exti);
+  exti_disable_request(exti);
   exti_reset_request(exti);
 
   timer_set_counter(kDebounceTimer.tim_, 0);
@@ -217,11 +217,14 @@ using ButtonEvent = std::variant<ButtonPressed, ButtonReleased, NoEvent>;
 /**
  * Update a button state given an rising or falling edge for it and send a
  * button events if applicable.
+ *
+ * If a button press is detected, the function will block until it has
+ * determined that the button is stable (not bouncing). The function may block
+ * for additional iterations if a button is pressed closed to the end of the
+ * previous delay period.
  */
 void ProcessButton(Button &button, RemoteState &remote_state) {
-
-  // gpio_toggle(led_status.port, led_status.pin);
-
+  // Handle the case that the button is in a stable state
   switch (button.state) {
   case ButtonState::kUp:
     remote_state.process_event(ButtonPressed{});
@@ -231,30 +234,36 @@ void ProcessButton(Button &button, RemoteState &remote_state) {
     remote_state.process_event(ButtonReleased{});
     button.state = ButtonState::kBouncingUp;
     break;
+  case ButtonState::kBouncingDown:
+  case ButtonState::kBouncingUp:
   default:; // do nothing
   }
 
-  while (true) {
+  bool is_bouncing{true};
+  while (is_bouncing) {
     switch (button.state) {
     case ButtonState::kBouncingDown:
       debounce_delay_block(button);
-      if (IsButtonUp(gpio_get(button.io.port_, button.io.pin_))) {
+      if (IsButtonDown(gpio_get(button.io.port_, button.io.pin_))) {
         button.state = ButtonState::kDown;
       } else {
         remote_state.process_event(ButtonReleased{});
         button.state = ButtonState::kBouncingUp;
       }
+      break;
     case ButtonState::kBouncingUp:
       debounce_delay_block(button);
-      if (IsButtonDown(gpio_get(button.io.port_, button.io.pin_))) {
+      if (IsButtonUp(gpio_get(button.io.port_, button.io.pin_))) {
         button.state = ButtonState::kUp;
       } else {
         remote_state.process_event(ButtonPressed{});
         button.state = ButtonState::kBouncingDown;
       }
+      break;
     case ButtonState::kUp:
     case ButtonState::kDown:
     default:
+      is_bouncing = false;
       break;
     }
   }
@@ -324,8 +333,7 @@ int main(void) {
     for (int i = 0; i < 400000; i++) {
       __asm__("nop");
     }
-    usart_send(USART2, 'h');
-    gpio_toggle(led_status.port, led_status.pin);
+    //gpio_toggle(led_status.port, led_status.pin);
   }
 
   return 0;
