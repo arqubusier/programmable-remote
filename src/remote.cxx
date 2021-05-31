@@ -42,23 +42,26 @@ util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
 std::uint32_t const kUsartBaud{2400};
 
-// constexpr const util::io_t output_ir{GPIOA,GPIO8}; // TIM1 CH1 output
-constexpr const util::io_t output_ir{GPIOA, GPIO0}; // TIM2 CH1 output
-// constexpr const util::io_t output_ir{GPIOA,GPIO6}; // TIM3 CH1 output
-
 constexpr size_t kNumButtons{1};
 struct Button {
+  Button(util::Io const &io) : io{io}, state{ButtonState::kUp} {}
   util::Io io;
   ButtonState state;
 };
 using Buttons = std::array<Button, kNumButtons>;
-Buttons buttons{Button{{GPIOA, GPIO3}, ButtonState::kUp}};
 
-constexpr const util::io_t input_ir{GPIOA, GPIO1};
-constexpr const util::io_t led_fail{GPIOA, GPIO5};
-constexpr const util::io_t led_ir{GPIOC, GPIO13};
-constexpr const util::io_t led_status{GPIOC, GPIO13};
-constexpr const util::io_t usart_io{GPIOA, GPIO2};
+// Buttons buttons{Button{{GPIOA, GPIO1}},  Button{{GPIOA, GPIO3}},
+//                Button{{GPIOA, GPIO4}},  Button{{GPIOA, GPIO5}},
+//                Button{{GPIOA, GPIO6}},  Button{{GPIOA, GPIO7}},
+//                Button{{GPIOA, GPIO8}},  Button{{GPIOA, GPIO9}},
+//                Button{{GPIOA, GPIO10}}, Button{{GPIOA, GPIO11}}};
+Buttons buttons{Button{{GPIOA, GPIO3}}};
+
+constexpr const util::Io ir_input{GPIOA, GPIO0};
+constexpr const util::Io ir_output{GPIOB, GPIO6};
+constexpr const util::Io led_status{GPIOC, GPIO13};
+constexpr const util::Io led_fail{GPIOC, GPIO0};
+constexpr const util::Io usart_io{GPIOA, GPIO2};
 
 bool IsButtonDown(std::uint16_t val) { return val & 0xFFFF; }
 
@@ -68,7 +71,7 @@ bool IsButtonUp(std::uint16_t val) { return !val; }
  * Setup
  */
 
-/*!
+/**
  * Enable fault handlers.
  */
 static void fault_setup(void) {
@@ -92,40 +95,45 @@ static void gpio_setup(void) {
   gpio_clear(led_status.port, led_status.pin);
 
   // Enable fail led as output
-  rcc_periph_clock_enable(RCC_GPIOA);
+  rcc_periph_clock_enable(RCC_GPIOC);
   gpio_set_mode(led_fail.port, GPIO_MODE_OUTPUT_50_MHZ,
                 GPIO_CNF_OUTPUT_PUSHPULL, led_fail.pin);
   gpio_clear(led_fail.port, led_fail.pin);
 
   // carrier timer output compare value on pin, connect to ir led.
-  rcc_periph_clock_enable(RCC_GPIOA);
-  gpio_set_mode(output_ir.port, GPIO_MODE_OUTPUT_50_MHZ,
-                GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, output_ir.pin);
+  rcc_periph_clock_enable(RCC_GPIOB);
+  gpio_set_mode(ir_output.port, GPIO_MODE_OUTPUT_50_MHZ,
+                GPIO_CNF_OUTPUT_ALTFN_PUSHPULL, ir_output.pin);
 
   // Ir input interrupt.
-  gpio_set_mode(input_ir.port, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT,
-                input_ir.pin);
-  nvic_enable_irq(NVIC_EXTI1_IRQ);
-  exti_select_source(EXTI1, input_ir.port);
-  exti_set_trigger(EXTI1, EXTI_TRIGGER_BOTH);
-  exti_enable_request(EXTI1);
+  rcc_periph_clock_enable(RCC_GPIOA);
+  gpio_set_mode(ir_input.port, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT,
+                ir_input.pin);
+  std::uint32_t ir_input_exti{util::GetExti(ir_input.pin).value()};
+  nvic_enable_irq(util::GetExtiIrqn(ir_input_exti).value());
+  exti_select_source(ir_input_exti, ir_input.port);
+  exti_set_trigger(ir_input_exti, EXTI_TRIGGER_BOTH);
+  exti_enable_request(ir_input_exti);
 }
 
-/*
+/**
  * Each switch is connected to a
  * a common high potential and its own button input.
+ *
  * Button inputs have pull-downs.
  */
 void buttons_setup() {
+  rcc_periph_clock_enable(RCC_GPIOA);
   for (const auto &button : buttons) {
-    uint32_t exti{util::GetExtiIrqn(button.io.pin_).value()};
-    gpio_set_mode(button.io.port_, GPIO_MODE_INPUT, GPIO_CNF_INPUT_PULL_UPDOWN,
-                  button.io.pin_);
-    uint16_t odr = gpio_port_read(button.io.port_);
-    gpio_port_write(button.io.port_, odr & ~(1 << button.io.pin_));
+    uint32_t exti{util::GetExti(button.io.pin).value()};
+    uint32_t extiIrq{util::GetExtiIrqn(exti).value()};
+    gpio_set_mode(button.io.port, GPIO_MODE_INPUT, GPIO_CNF_INPUT_PULL_UPDOWN,
+                  button.io.pin);
+    uint16_t odr = gpio_port_read(button.io.port);
+    gpio_port_write(button.io.port, odr & ~(1 << button.io.pin));
 
-    nvic_enable_irq(exti);
-    exti_select_source(exti, button.io.port_);
+    nvic_enable_irq(extiIrq);
+    exti_select_source(exti, button.io.port);
     exti_set_trigger(exti, EXTI_TRIGGER_BOTH);
     exti_enable_request(exti);
   }
@@ -196,11 +204,11 @@ void debounce_setup() {
 /**
  * Start debounce timer and wait for it, discarding interrupts for a button.
  *
- * The button interrupts are discarded to prevent multiple detected presses due
- * to bouncing.
+ * The button interrupts are discarded to prevent multiple detected presses
+ * due to bouncing.
  */
 void debounce_delay_block(Button &button) {
-  uint32_t exti{util::GetExtiIrqn(button.io.pin_).value()};
+  uint32_t exti{util::GetExtiIrqn(button.io.pin).value()};
   exti_disable_request(exti);
   exti_reset_request(exti);
 
@@ -224,6 +232,7 @@ using ButtonEvent = std::variant<ButtonPressed, ButtonReleased, NoEvent>;
  * previous delay period.
  */
 void ProcessButton(Button &button, RemoteState &remote_state) {
+  usart_send_blocking(USART2, 'a');
   // Handle the case that the button is in a stable state
   switch (button.state) {
   case ButtonState::kUp:
@@ -244,7 +253,7 @@ void ProcessButton(Button &button, RemoteState &remote_state) {
     switch (button.state) {
     case ButtonState::kBouncingDown:
       debounce_delay_block(button);
-      if (IsButtonDown(gpio_get(button.io.port_, button.io.pin_))) {
+      if (IsButtonDown(gpio_get(button.io.port, button.io.pin))) {
         button.state = ButtonState::kDown;
       } else {
         remote_state.process_event(ButtonReleased{});
@@ -253,7 +262,7 @@ void ProcessButton(Button &button, RemoteState &remote_state) {
       break;
     case ButtonState::kBouncingUp:
       debounce_delay_block(button);
-      if (IsButtonUp(gpio_get(button.io.port_, button.io.pin_))) {
+      if (IsButtonUp(gpio_get(button.io.port, button.io.pin))) {
         button.state = ButtonState::kUp;
       } else {
         remote_state.process_event(ButtonPressed{});
@@ -295,19 +304,21 @@ void usage_fault_handler(void) {
   }
 }
 
-void exti0_isr(void) { ProcessButton(buttons[0], g_remote_state); }
+void exti0_isr(void) {}
 
-void exti1_isr(void) { exti_reset_request(EXTI1); }
+void exti1_isr(void) {
+    usart_send_blocking(USART2, 'i');
+}
 
-void exti2_isr(void) { exti_reset_request(EXTI1); }
+void exti2_isr(void) {}
 
 void exti3_isr(void) { ProcessButton(buttons[0], g_remote_state); }
 
-void exti4_isr(void) { exti_reset_request(EXTI1); }
+void exti4_isr(void) {}
 
-void exti9_5_isr(void) { exti_reset_request(EXTI1); }
+void exti9_5_isr(void) {}
 
-void exti10_15_isr(void) { exti_reset_request(EXTI1); }
+void exti10_15_isr(void) {}
 
 void tim3_isr(void) {}
 
@@ -325,15 +336,20 @@ int main(void) {
   fault_setup();
   clock_setup();
   usart_setup();
-  gpio_setup();
+  usart_send_blocking(USART2, 'e');
+  gpio_setup(); // STUCK HERE
+  usart_send_blocking(USART2, 'b');
   buttons_setup();
+  usart_send_blocking(USART2, 'c');
   debounce_setup();
+  usart_send_blocking(USART2, 'd');
   while (1) {
     /* wait a little bit */
     for (int i = 0; i < 400000; i++) {
       __asm__("nop");
     }
-    //gpio_toggle(led_status.port, led_status.pin);
+    // gpio_toggle(led_status.port, led_status.pin);
+    usart_send_blocking(USART2, 'b');
   }
 
   return 0;

@@ -6,7 +6,7 @@ CPPFILES = remote.cxx
 DEVICE = stm32f103C8T6
 OOCD_FILE = ./bluepill.cfg
 
-CXXFLAGS = -DNDEBUG -O0 -g -fno-exceptions -fno-rtti -std=c++17
+CXXFLAGS = -DNDEBUG -O0 -g -fno-exceptions -fno-rtti -std=c++17 -Wno-shadow -Weffc++
 LDFLAGS += -Wl,-Map=output.map
 
 

@@ -21,9 +21,9 @@ Default seems to be 36mHz -> internal?
 
 ** Timers
 
-- carrier
-- inter segment (inter command)
-- debounce
+- carrier tim4, tim4_ch1  pb6 (remap==0)
+- inter segment (inter command) tim3
+- debounce tim3
 
 Total time = (counter*prescaler)/SYSCLK frequency
 prescaler = (total time*SYSCLK frequency)/countermax

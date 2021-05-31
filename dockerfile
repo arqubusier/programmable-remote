@@ -15,7 +15,9 @@ libstdc++-arm-none-eabi-newlib \
 openocd \
 python \
 cmake \
-bear
+bear \
+tmux \
+telnet
 
 #OpenOCD talks to the chip through USB, so we need to grant our account access to the FTDI.
 ##RUN cp /usr/local/share/openocd/contrib/60-openocd.rules /etc/udev/rules.d/60-openocd.rules

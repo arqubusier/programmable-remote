@@ -103,6 +103,8 @@ constexpr std::optional<uint8_t> GetExti(uint32_t pin) {
 }
 constexpr std::optional<uint8_t> GetExtiIrqn(uint32_t exti) {
   switch (exti) {
+  case EXTI0:
+    return NVIC_EXTI0_IRQ;
   case EXTI1:
     return NVIC_EXTI1_IRQ;
   case EXTI2:
@@ -153,14 +155,9 @@ constexpr uint32_t ns2count(uint32_t frequency, uint32_t val_ns) {
   return static_cast<uint32_t>(val * frequency_ / divisor);
 }
 
-struct io_t {
+struct Io {
   uint32_t port;
   uint32_t pin;
-};
-
-struct Io {
-  uint32_t port_;
-  uint32_t pin_;
 };
 
 /*
