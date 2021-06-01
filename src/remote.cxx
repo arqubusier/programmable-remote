@@ -10,11 +10,14 @@
 #include <variant>
 
 #include "boost/sml.hpp"
+#include "buttons.hpp"
+#include "util.hpp"
 #include "util_libopencm3.hpp"
 
-enum struct ButtonState { kUp, kBouncingDown, kBouncingUp, kDown };
+using u16 = util::u16;
+using u32 = util::u32;
+using u8 = util::u8;
 
-enum struct ButtonUpMask : std::uint16_t { kUp = 0, kDown = 0xFFFF };
 namespace sml = boost::sml;
 
 // Do not divide clock for highest possible resolution
@@ -23,15 +26,15 @@ namespace sml = boost::sml;
 util::Timer output_carrier_timer{TIM2, TIM_OC1, 0, 947};
 // NOTE: there is an an error when calculating the prescaler value at
 // compile-time, therefore the calculation is performed manually.
-uint32_t const inter_command_timer_freq = 100 * KILO;
+u32 const inter_command_timer_freq = 100 * KILO;
 // (rcc_apb1_frequency * 2)/ input_segment_timer_freq = 720
-uint32_t const inter_command_prescaler = 720;
+u32 const inter_command_prescaler = 720;
 util::Timer inter_command_timer{
     TIM1, TIM_OC1, inter_command_prescaler,
     util::ns2count(inter_command_timer_freq, 500 * MEGA)};
-uint32_t const input_inter_segment_timer_freq = 2 * MEGA;
+u32 const input_inter_segment_timer_freq = 2 * MEGA;
 // (rcc_apb1_frequency * 2)/ input_segment_timer_freq = 36
-uint32_t const input_inter_segment_prescaler = 36;
+u32 const input_inter_segment_prescaler = 36;
 util::Timer input_inter_segment_timer{
     TIM3, TIM_OC1, input_inter_segment_prescaler,
     util::ns2count(input_inter_segment_timer_freq, 24 * MEGA)};
@@ -40,30 +43,20 @@ util::Timer output_inter_segment_timer{
     util::ns2count(input_inter_segment_timer_freq, 24 * MEGA)};
 util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
-std::uint32_t const kUsartBaud{2400};
+u32 const kUsartBaud{2400};
 
-enum struct ButtonSymbols { k0, k1, k2, k3, k4, k5, k6, kBack, kOk };
-constexpr size_t kNumButtons{6};
-struct Button {
-  Button(util::Io const &io) : io{io}, state{ButtonState::kUp} {}
-  util::Io io;
-  ButtonState state;
-};
-using Buttons = std::array<Button, kNumButtons>;
-
-Buttons buttons{Button{{GPIOA, GPIO1}}, Button{{GPIOA, GPIO3}},
-                Button{{GPIOA, GPIO4}}, Button{{GPIOA, GPIO5}},
-                Button{{GPIOA, GPIO6}}, Button{{GPIOA, GPIO7}}};
+auto g_buttons = std::make_tuple(Button<ButtonSymbol::kBack>{{GPIOA, GPIO1}},
+                                 Button<ButtonSymbol::kOk>{{GPIOA, GPIO3}},
+                                 Button<ButtonSymbol::k0>{{GPIOA, GPIO4}},
+                                 Button<ButtonSymbol::k1>{{GPIOA, GPIO5}},
+                                 Button<ButtonSymbol::k2>{{GPIOA, GPIO6}},
+                                 Button<ButtonSymbol::k3>{{GPIOA, GPIO7}});
 
 constexpr const util::Io ir_input{GPIOA, GPIO0};
 constexpr const util::Io ir_output{GPIOB, GPIO6};
 constexpr const util::Io led_status{GPIOC, GPIO13};
 constexpr const util::Io led_fail{GPIOC, GPIO0};
 constexpr const util::Io usart_io{GPIOA, GPIO2};
-
-bool IsButtonDown(std::uint16_t val) { return val & 0xFFFF; }
-
-bool IsButtonUp(std::uint16_t val) { return !val; }
 
 /*
  * Setup
@@ -107,34 +100,11 @@ static void gpio_setup(void) {
   rcc_periph_clock_enable(RCC_GPIOA);
   gpio_set_mode(ir_input.port, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT,
                 ir_input.pin);
-  std::uint32_t ir_input_exti{util::GetExti(ir_input.pin).value()};
+  u32 ir_input_exti{util::GetExti(ir_input.pin).value()};
   nvic_enable_irq(util::GetExtiIrqn(ir_input_exti).value());
   exti_select_source(ir_input_exti, ir_input.port);
   exti_set_trigger(ir_input_exti, EXTI_TRIGGER_BOTH);
   exti_enable_request(ir_input_exti);
-}
-
-/**
- * Each switch is connected to a
- * a common high potential and its own button input.
- *
- * Button inputs have pull-downs.
- */
-void buttons_setup() {
-  rcc_periph_clock_enable(RCC_GPIOA);
-  for (const auto &button : buttons) {
-    uint32_t exti{util::GetExti(button.io.pin).value()};
-    uint32_t extiIrq{util::GetExtiIrqn(exti).value()};
-    gpio_set_mode(button.io.port, GPIO_MODE_INPUT, GPIO_CNF_INPUT_PULL_UPDOWN,
-                  button.io.pin);
-    uint16_t odr = gpio_port_read(button.io.port);
-    gpio_port_write(button.io.port, odr & ~(1 << button.io.pin));
-
-    nvic_enable_irq(extiIrq);
-    exti_select_source(exti, button.io.port);
-    exti_set_trigger(exti, EXTI_TRIGGER_BOTH);
-    exti_enable_request(exti);
-  }
 }
 
 void usart_setup() {
@@ -157,8 +127,20 @@ void usart_setup() {
   usart_enable(USART2);
 }
 
-struct ButtonPressed {};
-struct ButtonReleased {};
+/**
+ * Each switch is connected to a
+ * a common high potential and its own button input.
+ *
+ * Button inputs have pull-downs.
+ */
+void buttons_setup() {
+  rcc_periph_clock_enable(RCC_GPIOA);
+  std::apply([](auto &&...buttons) { (button_setup(buttons), ...); },
+             g_buttons);
+}
+
+template <ButtonSymbol> struct ButtonDown {};
+template <ButtonSymbol> struct ButtonUp {};
 struct NoEvent {};
 auto off = sml::state<class off>;
 auto on = sml::state<class on>;
@@ -167,8 +149,8 @@ auto toggle = []() { gpio_toggle(led_status.port, led_status.pin); };
 struct RemoteStateTable {
   auto operator()() const {
     return sml::make_transition_table(
-        *off + sml::event<ButtonPressed> / toggle = on,
-        on + sml::event<ButtonPressed> / toggle = off);
+        *off + sml::event<ButtonDown<ButtonSymbol::k0>> / toggle = on,
+        on + sml::event<ButtonDown<ButtonSymbol::k0>> / toggle = off);
   }
 };
 
@@ -205,8 +187,8 @@ void debounce_setup() {
  * The button interrupts are discarded to prevent multiple detected presses
  * due to bouncing.
  */
-void debounce_delay_block(Button &button) {
-  uint32_t exti{util::GetExtiIrqn(button.io.pin).value()};
+template <typename ButtonT> void debounce_delay_block(ButtonT &button) {
+  u32 exti{util::GetExtiIrqn(button.io.pin).value()};
   exti_disable_request(exti);
   exti_reset_request(exti);
 
@@ -219,7 +201,6 @@ void debounce_delay_block(Button &button) {
   exti_enable_request(exti);
 }
 
-using ButtonEvent = std::variant<ButtonPressed, ButtonReleased, NoEvent>;
 /**
  * Update a button state given an rising or falling edge for it and send a
  * button events if applicable.
@@ -229,15 +210,17 @@ using ButtonEvent = std::variant<ButtonPressed, ButtonReleased, NoEvent>;
  * for additional iterations if a button is pressed closed to the end of the
  * previous delay period.
  */
-void ProcessButton(Button &button, RemoteState &remote_state) {
+template <typename ButtonT>
+void ProcessButton(ButtonT &button, RemoteState &remote_state) {
   // Handle the case that the button is in a stable state
   switch (button.state) {
   case ButtonState::kUp:
-    remote_state.process_event(ButtonPressed{});
+    remote_state.process_event(ButtonDown<ButtonT::GetSym()>{});
     button.state = ButtonState::kBouncingDown;
     break;
   case ButtonState::kDown:
-    remote_state.process_event(ButtonReleased{});
+    // Button released event
+    remote_state.process_event(ButtonUp<ButtonT::GetSym()>{});
     button.state = ButtonState::kBouncingUp;
     break;
   case ButtonState::kBouncingDown:
@@ -253,7 +236,7 @@ void ProcessButton(Button &button, RemoteState &remote_state) {
       if (IsButtonDown(gpio_get(button.io.port, button.io.pin))) {
         button.state = ButtonState::kDown;
       } else {
-        remote_state.process_event(ButtonReleased{});
+        remote_state.process_event(ButtonUp<ButtonT::GetSym()>{});
         button.state = ButtonState::kBouncingUp;
       }
       break;
@@ -262,7 +245,7 @@ void ProcessButton(Button &button, RemoteState &remote_state) {
       if (IsButtonUp(gpio_get(button.io.port, button.io.pin))) {
         button.state = ButtonState::kUp;
       } else {
-        remote_state.process_event(ButtonPressed{});
+        remote_state.process_event(ButtonDown<ButtonT::GetSym()>{});
         button.state = ButtonState::kBouncingDown;
       }
       break;
@@ -281,21 +264,21 @@ void ProcessButton(Button &button, RemoteState &remote_state) {
 extern "C" {
 
 void mem_manage_handler(void) {
-  volatile uint32_t cfsr = SCB_CFSR;
-  volatile uint32_t mmfar = SCB_MMFAR;
+  volatile u32 cfsr = SCB_CFSR;
+  volatile u32 mmfar = SCB_MMFAR;
   while (1) {
     ;
   }
 }
 void bus_fault_handler(void) {
-  volatile uint32_t cfsr = SCB_CFSR;
-  volatile uint32_t bfar = SCB_BFAR;
+  volatile u32 cfsr = SCB_CFSR;
+  volatile u32 bfar = SCB_BFAR;
   while (1) {
     ;
   }
 }
 void usage_fault_handler(void) {
-  volatile uint32_t cfsr = SCB_CFSR;
+  volatile u32 cfsr = SCB_CFSR;
   while (1) {
     ;
   }
@@ -307,7 +290,7 @@ void exti1_isr(void) {}
 
 void exti2_isr(void) {}
 
-void exti3_isr(void) { ProcessButton(buttons[0], g_remote_state); }
+void exti3_isr(void) { ProcessButton(std::get<0>(g_buttons), g_remote_state); }
 
 void exti4_isr(void) {}
 
