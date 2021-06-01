@@ -42,7 +42,8 @@ util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
 std::uint32_t const kUsartBaud{2400};
 
-constexpr size_t kNumButtons{1};
+enum struct ButtonSymbols { k0, k1, k2, k3, k4, k5, k6, kBack, kOk };
+constexpr size_t kNumButtons{6};
 struct Button {
   Button(util::Io const &io) : io{io}, state{ButtonState::kUp} {}
   util::Io io;
@@ -50,12 +51,9 @@ struct Button {
 };
 using Buttons = std::array<Button, kNumButtons>;
 
-// Buttons buttons{Button{{GPIOA, GPIO1}},  Button{{GPIOA, GPIO3}},
-//                Button{{GPIOA, GPIO4}},  Button{{GPIOA, GPIO5}},
-//                Button{{GPIOA, GPIO6}},  Button{{GPIOA, GPIO7}},
-//                Button{{GPIOA, GPIO8}},  Button{{GPIOA, GPIO9}},
-//                Button{{GPIOA, GPIO10}}, Button{{GPIOA, GPIO11}}};
-Buttons buttons{Button{{GPIOA, GPIO3}}};
+Buttons buttons{Button{{GPIOA, GPIO1}}, Button{{GPIOA, GPIO3}},
+                Button{{GPIOA, GPIO4}}, Button{{GPIOA, GPIO5}},
+                Button{{GPIOA, GPIO6}}, Button{{GPIOA, GPIO7}}};
 
 constexpr const util::Io ir_input{GPIOA, GPIO0};
 constexpr const util::Io ir_output{GPIOB, GPIO6};
@@ -232,7 +230,6 @@ using ButtonEvent = std::variant<ButtonPressed, ButtonReleased, NoEvent>;
  * previous delay period.
  */
 void ProcessButton(Button &button, RemoteState &remote_state) {
-  usart_send_blocking(USART2, 'a');
   // Handle the case that the button is in a stable state
   switch (button.state) {
   case ButtonState::kUp:
@@ -306,9 +303,7 @@ void usage_fault_handler(void) {
 
 void exti0_isr(void) {}
 
-void exti1_isr(void) {
-    usart_send_blocking(USART2, 'i');
-}
+void exti1_isr(void) {}
 
 void exti2_isr(void) {}
 
@@ -336,20 +331,16 @@ int main(void) {
   fault_setup();
   clock_setup();
   usart_setup();
-  usart_send_blocking(USART2, 'e');
   gpio_setup(); // STUCK HERE
-  usart_send_blocking(USART2, 'b');
   buttons_setup();
-  usart_send_blocking(USART2, 'c');
   debounce_setup();
-  usart_send_blocking(USART2, 'd');
   while (1) {
     /* wait a little bit */
     for (int i = 0; i < 400000; i++) {
       __asm__("nop");
     }
-    // gpio_toggle(led_status.port, led_status.pin);
     usart_send_blocking(USART2, 'b');
+    // gpio_toggle(led_status.port, led_status.pin);
   }
 
   return 0;
