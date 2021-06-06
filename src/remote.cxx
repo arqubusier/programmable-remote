@@ -55,7 +55,7 @@ auto g_buttons = std::make_tuple(Button<ButtonSymbol::kBack>{{GPIOA, GPIO1}},
 constexpr const util::Io ir_input{GPIOA, GPIO0};
 constexpr const util::Io ir_output{GPIOB, GPIO6};
 constexpr const util::Io led_status{GPIOC, GPIO13};
-constexpr const util::Io led_fail{GPIOC, GPIO0};
+constexpr const util::Io led_fail{GPIOC, GPIO14};
 constexpr const util::Io usart_io{GPIOA, GPIO2};
 
 /*
