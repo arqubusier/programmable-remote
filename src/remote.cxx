@@ -142,7 +142,8 @@ void buttons_setup() {
 template <ButtonSymbol> struct ButtonDown {};
 template <ButtonSymbol> struct ButtonUp {};
 struct NoEvent {};
-auto off = sml::state<class off>;
+struct IrEdge {};
+auto Idle = sml::state<class Idle>;
 auto on = sml::state<class on>;
 auto toggle = []() { gpio_toggle(led_status.port, led_status.pin); };
 
@@ -284,7 +285,7 @@ void usage_fault_handler(void) {
   }
 }
 
-void exti0_isr(void) {}
+  void exti0_isr(void) { g_remote_state.process_event()}
 
 void exti1_isr(void) {}
 
