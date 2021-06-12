@@ -50,12 +50,12 @@ util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
 u32 const kUsartBaud{2400};
 
-auto g_buttons = std::make_tuple(Button<ButtonSymbol::kEsc>{{GPIOA, GPIO1}},
-                                 Button<ButtonSymbol::kOk>{{GPIOA, GPIO3}},
-                                 Button<ButtonSymbol::k0>{{GPIOA, GPIO4}},
-                                 Button<ButtonSymbol::k1>{{GPIOA, GPIO5}},
-                                 Button<ButtonSymbol::k2>{{GPIOA, GPIO6}},
-                                 Button<ButtonSymbol::k3>{{GPIOA, GPIO7}});
+auto g_buttons = std::make_tuple(Button<Sym::kEsc>{{GPIOA, GPIO1}},
+                                 Button<Sym::kOk>{{GPIOA, GPIO3}},
+                                 Button<Sym::k0>{{GPIOA, GPIO4}},
+                                 Button<Sym::k1>{{GPIOA, GPIO5}},
+                                 Button<Sym::k2>{{GPIOA, GPIO6}},
+                                 Button<Sym::k3>{{GPIOA, GPIO7}});
 
 constexpr const util::Io ir_input{GPIOA, GPIO0};
 constexpr const util::Io ir_output{GPIOB, GPIO6};
@@ -180,8 +180,8 @@ void ir_timers_setup() {}
 StateMachine
 
 *******************************************************************************/
-template <ButtonSymbol> struct ButtonDown {};
-template <ButtonSymbol> struct ButtonUp {};
+template <Sym> struct ButtonDown {};
+template <Sym> struct ButtonUp {};
 struct NoEvent {};
 struct IrEdge {};
 struct CarrierTimeout {};
@@ -212,20 +212,20 @@ auto SaveCmd = [](RxState &state) {};
 struct RemoteStateTable {
   auto operator()() const {
     return sml::make_transition_table(
-        *Idle + sml::event<ButtonDown<ButtonSymbol::kOk>> = SelectingProg,
-        SelectingProg + sml::event<ButtonDown<ButtonSymbol::k0>> / SelectProg =
+        *Idle + sml::event<ButtonDown<Sym::kOk>> = SelectingProg,
+        SelectingProg + sml::event<ButtonDown<Sym::k0>> / SelectProg =
             ProgIdle,
         ProgIdle + sml::event<IrEdge> / ResetSegTimer = CarrierRx,
-        ProgIdle + sml::event<ButtonDown<ButtonSymbol::kOk>> / SaveProg =
+        ProgIdle + sml::event<ButtonDown<Sym::kOk>> / SaveProg =
             CarrierRx,
-        ProgIdle + sml::event<ButtonDown<ButtonSymbol::kEsc>> / SaveProg =
+        ProgIdle + sml::event<ButtonDown<Sym::kEsc>> / SaveProg =
             CarrierRx,
         CarrierRx + sml::event<CarrierTimeout> / FailProgramming = ProgIdle,
         CarrierRx + sml::event<IrEdge> / SaveSeg = QuietRx,
         QuietRx + sml::event<IrEdge> / SaveSeg = CarrierRx,
         QuietRx + sml::event<CmdTimeout> = CmdOk,
-        CmdOk + sml::event<ButtonDown<ButtonSymbol::kOk>> / SaveCmd = ProgIdle,
-        CmdOk + sml::event<ButtonDown<ButtonSymbol::kEsc>> = ProgIdle);
+        CmdOk + sml::event<ButtonDown<Sym::kOk>> / SaveCmd = ProgIdle,
+        CmdOk + sml::event<ButtonDown<Sym::kEsc>> = ProgIdle);
   }
 };
 

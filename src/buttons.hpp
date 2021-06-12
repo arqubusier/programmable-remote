@@ -10,13 +10,13 @@ using u32 = util::u32;
 using u8 = util::u8;
 
 enum struct ButtonState { kUp, kBouncingDown, kBouncingUp, kDown };
-enum struct ButtonSymbol { k0, k1, k2, k3, k4, k5, k6, kEsc, kOk };
+enum struct Sym { k0, k1, k2, k3, k4, k5, k6, kEsc, kOk };
 
-template <ButtonSymbol symbolV> struct Button {
+template <Sym symbolV> struct Button {
   Button(util::Io io) : io{io}, state{ButtonState::kUp} {}
   util::Io io;
   ButtonState state;
-  constexpr static ButtonSymbol GetSym() { return symbolV; }
+  constexpr static Sym GetSym() { return symbolV; }
 };
 
 bool IsButtonDown(u16 val) { return val & 0xFFFF; }
