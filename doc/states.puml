@@ -1,46 +1,30 @@
 @startuml
 [*] -> Idle
-Idle --> Tx : Press(ProgN)\n[SegN(ProgN) > 0]
-Idle --> Rx : Press(Ok)
+Idle --> SelectProg : Down(Ok)
+SelectProg -> ProgramIdle: Down(N)\n/prog=N, seg=0, cmd=0
+SelectProg --> Idle: Down(Esc)
 
-state Rx {
-  state RxDone <<exitPoint>>
-  [*] -> SelectProg
-  state Program{
-      state ProgramDone <<exitPoint>>
-      [*] --> ProgramIdle
-      ProgramIdle --> ProgramDone : Press(Ok)
-      ProgramDone --> SelectProg
-      ProgramIdle --> QuietRx: Toggle(IrIn)\n/ Reset RxT
+ProgramIdle --> Idle : Down(Ok), Down(Esc)
+ProgramIdle --> CarrierRx: Toggle(IrIn)\n/ Reset RxT
 
-      QuietRx -> CarrierRx: Toggle(IrIn)\n/ segments[seg] = RxT.val,\nReset RxT
-      CarrierRx -> QuietRx: Toggle(IrIn)\n/ segments[seg] = RxT.val,\nReset RxT
-      CarrierRx --> ProgramIdle: Timeout(RxT)\n/ clear last command,\nshow error
-      QuietRx -> CommandOk: Timeout(RxT)\n/ Programs[prog] = segments,\nshow succes
-      CommandOk -> ProgramIdle: Press(Ok)\n/ save last command
-      CommandOk -> QuietRx: Toggle(IrIn)\n/ clear last command
-  }
-  Program: Enter/ Setup RxT, seg=0
-  Program: Exit/ Teardown RxT, seg=0
-  SelectProg -> Program: Press(N)\n/prog=N
-  Program --> SelectProg: Press(Back)
-  SelectProg --> RxDone: Press(Back)
-  RxDone -> Idle
-}
+QuietRx -> CarrierRx: Toggle(IrIn)\n/ segments[seg] = RxT.val,\nReset RxT
+CarrierRx -> QuietRx: Toggle(IrIn)\n/ segments[seg] = RxT.val,\nReset RxT
+CarrierRx --> ProgramIdle: Timeout(RxT)\n/ clear last command,\nshow error
+QuietRx -> CommandOk: Timeout(RxT)\n/ Programs[prog][cmd] = segments,\nshow succes
+CommandOk -> ProgramIdle: Down(Ok)\n/ save last command, cmd++
+CommandOk -> ProgramIdle: Down(Esc)\n/ clear last command
 
 
-
+Idle --> Tx : Down(ProgN)\n[SegN(ProgN) > 0]
 state Tx {
   [*] --> CarrierTx
   CarrierTx --> QuietTx : Timeout(SegT)\n/ IROut low,\nset SegT to next segment
   QuietTx --> CarrierTx : Timeout(SegT)\n/ IROut High,\nset SegT to next segment,\nseg++
   CarrierTx -> CarrierTx : [SegN(ProgN) == seg]\n/ StopTx
 }
-Tx: Enter / seg=0, Setup SegT and CarrierT
-Tx: End / Teardown SegT and CarrierT
-note left of Tx: Command separation uses the same timer as segments.\nThis allows for a command pause of up to 325ms.
-Tx --> Idle : Press(Back), StopTx
+note right of Tx: Command separation uses the same timer as segments.\nThis allows for a command pause of up to 325ms.
+Tx --> Idle : Down(Esc), StopTx
 
+CommandOk -[hidden]-> SelectProg
 
-Rx -[hidden]> Tx 
 @enduml

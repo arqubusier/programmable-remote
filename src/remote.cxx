@@ -20,6 +20,11 @@ using u8 = util::u8;
 
 namespace sml = boost::sml;
 
+/*******************************************************************************
+
+Globals
+
+*******************************************************************************/
 // Do not divide clock for highest possible resolution
 // Frequency is ABP1 clock * 2 = 72 MHz.
 // 1 period = 947 * (1/72MHz) = 13.15277... us <=> 76 KHz = 2*38 Khz
@@ -45,7 +50,7 @@ util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
 u32 const kUsartBaud{2400};
 
-auto g_buttons = std::make_tuple(Button<ButtonSymbol::kBack>{{GPIOA, GPIO1}},
+auto g_buttons = std::make_tuple(Button<ButtonSymbol::kEsc>{{GPIOA, GPIO1}},
                                  Button<ButtonSymbol::kOk>{{GPIOA, GPIO3}},
                                  Button<ButtonSymbol::k0>{{GPIOA, GPIO4}},
                                  Button<ButtonSymbol::k1>{{GPIOA, GPIO5}},
@@ -58,9 +63,11 @@ constexpr const util::Io led_status{GPIOC, GPIO13};
 constexpr const util::Io led_fail{GPIOC, GPIO14};
 constexpr const util::Io usart_io{GPIOA, GPIO2};
 
-/*
- * Setup
- */
+/*******************************************************************************
+
+Setup
+
+*******************************************************************************/
 
 /**
  * Enable fault handlers.
@@ -139,25 +146,6 @@ void buttons_setup() {
              g_buttons);
 }
 
-template <ButtonSymbol> struct ButtonDown {};
-template <ButtonSymbol> struct ButtonUp {};
-struct NoEvent {};
-struct IrEdge {};
-auto Idle = sml::state<class Idle>;
-auto on = sml::state<class on>;
-auto toggle = []() { gpio_toggle(led_status.port, led_status.pin); };
-
-struct RemoteStateTable {
-  auto operator()() const {
-    return sml::make_transition_table(
-        *off + sml::event<ButtonDown<ButtonSymbol::k0>> / toggle = on,
-        on + sml::event<ButtonDown<ButtonSymbol::k0>> / toggle = off);
-  }
-};
-
-using RemoteState = sml::sm<RemoteStateTable>;
-RemoteState g_remote_state{};
-
 /**
  * Configure the debounce timer.
  */
@@ -181,6 +169,68 @@ void debounce_setup() {
   timer_set_period(kDebounceTimer.tim_, kDebounceTimer.period_);
   timer_generate_event(kDebounceTimer.tim_, TIM_EGR_UG);
 }
+
+/**
+ * Setup timers used in transmitting/receiving Ir
+ */
+void ir_timers_setup() {}
+
+/*******************************************************************************
+
+StateMachine
+
+*******************************************************************************/
+template <ButtonSymbol> struct ButtonDown {};
+template <ButtonSymbol> struct ButtonUp {};
+struct NoEvent {};
+struct IrEdge {};
+struct CarrierTimeout {};
+struct CmdTimeout {};
+auto Idle = sml::state<class Idle>;
+auto SelectingProg = sml::state<class SelectProg>;
+auto ProgIdle = sml::state<class ProgIdle>;
+auto CarrierRx = sml::state<class CarrierRx>;
+auto QuietRx = sml::state<class QuietRx>;
+auto CmdOk = sml::state<class CmdOk>;
+auto toggle = []() { gpio_toggle(led_status.port, led_status.pin); };
+
+struct RxState {};
+RxState g_rx_state{};
+
+auto FailProgramming = [] {};
+
+auto ResetSegTimer = [] {};
+
+auto SelectProg = [](RxState &state, auto event) {};
+
+auto SaveProg = [](RxState &state) {};
+
+auto SaveSeg = [](RxState &state) {};
+
+auto SaveCmd = [](RxState &state) {};
+
+struct RemoteStateTable {
+  auto operator()() const {
+    return sml::make_transition_table(
+        *Idle + sml::event<ButtonDown<ButtonSymbol::kOk>> = SelectingProg,
+        SelectingProg + sml::event<ButtonDown<ButtonSymbol::k0>> / SelectProg =
+            ProgIdle,
+        ProgIdle + sml::event<IrEdge> / ResetSegTimer = CarrierRx,
+        ProgIdle + sml::event<ButtonDown<ButtonSymbol::kOk>> / SaveProg =
+            CarrierRx,
+        ProgIdle + sml::event<ButtonDown<ButtonSymbol::kEsc>> / SaveProg =
+            CarrierRx,
+        CarrierRx + sml::event<CarrierTimeout> / FailProgramming = ProgIdle,
+        CarrierRx + sml::event<IrEdge> / SaveSeg = QuietRx,
+        QuietRx + sml::event<IrEdge> / SaveSeg = CarrierRx,
+        QuietRx + sml::event<CmdTimeout> = CmdOk,
+        CmdOk + sml::event<ButtonDown<ButtonSymbol::kOk>> / SaveCmd = ProgIdle,
+        CmdOk + sml::event<ButtonDown<ButtonSymbol::kEsc>> = ProgIdle);
+  }
+};
+
+using RemoteState = sml::sm<RemoteStateTable>;
+RemoteState g_remote_state{g_rx_state};
 
 /**
  * Start debounce timer and wait for it, discarding interrupts for a button.
@@ -259,9 +309,11 @@ void ProcessButton(ButtonT &button, RemoteState &remote_state) {
   }
 }
 
-/*
- * Isrs
- */
+/*******************************************************************************
+
+ISRs
+
+*******************************************************************************/
 extern "C" {
 
 void mem_manage_handler(void) {
@@ -285,19 +337,22 @@ void usage_fault_handler(void) {
   }
 }
 
-  void exti0_isr(void) { g_remote_state.process_event()}
+void exti0_isr(void) { g_remote_state.process_event(IrEdge{}); }
 
-void exti1_isr(void) {}
+void exti1_isr(void) { ProcessButton(std::get<0>(g_buttons), g_remote_state); }
 
-void exti2_isr(void) {}
+void exti2_isr(void) { /* USART2 */
+}
 
-void exti3_isr(void) { ProcessButton(std::get<0>(g_buttons), g_remote_state); }
+void exti3_isr(void) { ProcessButton(std::get<1>(g_buttons), g_remote_state); }
 
-void exti4_isr(void) {}
+void exti4_isr(void) { ProcessButton(std::get<2>(g_buttons), g_remote_state); }
 
-void exti9_5_isr(void) {}
+void exti9_5_isr(void) { /* TODO use EXTI_PR to determine value */
+}
 
-void exti10_15_isr(void) {}
+void exti10_15_isr(void) { /* unused */
+}
 
 void tim3_isr(void) {}
 
@@ -308,9 +363,11 @@ void tim4_isr(void) {}
 // Normally used when calling destructors for global objects
 // Since we will never return from main it will be unused.
 void *__dso_handle = nullptr;
-/*!
- * Main
- */
+/*******************************************************************************
+
+Main
+
+*******************************************************************************/
 int main(void) {
   fault_setup();
   clock_setup();
@@ -318,6 +375,7 @@ int main(void) {
   gpio_setup(); // STUCK HERE
   buttons_setup();
   debounce_setup();
+  ir_timers_setup();
   while (1) {
     /* wait a little bit */
     for (int i = 0; i < 400000; i++) {

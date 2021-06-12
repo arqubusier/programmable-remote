@@ -10,7 +10,7 @@ using u32 = util::u32;
 using u8 = util::u8;
 
 enum struct ButtonState { kUp, kBouncingDown, kBouncingUp, kDown };
-enum struct ButtonSymbol { k0, k1, k2, k3, k4, k5, k6, kBack, kOk };
+enum struct ButtonSymbol { k0, k1, k2, k3, k4, k5, k6, kEsc, kOk };
 
 template <ButtonSymbol symbolV> struct Button {
   Button(util::Io io) : io{io}, state{ButtonState::kUp} {}
