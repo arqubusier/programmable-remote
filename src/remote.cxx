@@ -259,7 +259,8 @@ template <typename ButtonT> void debounce_delay_block(ButtonT &button) {
  * If a button press is detected, the function will block until it has
  * determined that the button is stable (not bouncing). The function may block
  * for additional iterations if a button is pressed closed to the end of the
- * previous delay period.
+ * previous delay period. This function automatically clears the exti interrupt
+ * flag.
  */
 template <typename ButtonT>
 void ProcessButton(ButtonT &button, RemoteState &remote_state) {
@@ -337,7 +338,10 @@ void usage_fault_handler(void) {
   }
 }
 
-void exti0_isr(void) { g_remote_state.process_event(IrEdge{}); }
+void exti0_isr(void) {
+  exti_reset_request(EXTI0);
+  g_remote_state.process_event(IrEdge{});
+}
 
 void exti1_isr(void) { ProcessButton(std::get<0>(g_buttons), g_remote_state); }
 
