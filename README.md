@@ -40,6 +40,20 @@ In the container run:
 
   root@mycontainer $ openocd -f bluepill.cfg -c "program src/programmable-remote.elf verify reset exit"
 
+## compile and flash using running openocd server
+
+Start openocd server
+
+  root@mycontainer openocd -f bluepill.cfg
+  
+Build and flash:
+
+DOES NOT WORK
+  root@mycontainer make -C src && echo "program src/programmable-remote.elf verify reset" | telnet localhost 4444
+
+## Debug with openocd and gdb
+
+  root@mycontainer gdb-multiarch -tui --eval-command="target remote localhost:3333" src/programmable-remote.elf
 
 ## Generate compile_commands.json
 

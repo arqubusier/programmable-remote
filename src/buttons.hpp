@@ -13,8 +13,9 @@ enum struct ButtonState { kUp, kBouncingDown, kBouncingUp, kDown };
 enum struct Sym { k0, k1, k2, k3, k4, k5, k6, kEsc, kOk };
 
 template <Sym symbolV> struct Button {
-  Button(util::Io io) : io{io}, state{ButtonState::kUp} {}
-  util::Io io;
+  constexpr Button(util::Io const& io) : io{io}, state{ButtonState::kUp} {
+  }
+  util::Io const io;
   ButtonState state;
   constexpr static Sym GetSym() { return symbolV; }
 };
@@ -28,7 +29,7 @@ template <typename Button> void button_setup(Button const &button) {
   u32 extiIrq{util::GetExtiIrqn(exti).value()};
   gpio_set_mode(button.io.port, GPIO_MODE_INPUT, GPIO_CNF_INPUT_PULL_UPDOWN,
                 button.io.pin);
-  u16 odr = gpio_port_read(button.io.port);
+  u16 odr = (uint16_t)GPIO_ODR(button.io.port);
   gpio_port_write(button.io.port, odr & ~(1 << button.io.pin));
 
   nvic_enable_irq(extiIrq);

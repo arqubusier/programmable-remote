@@ -50,18 +50,16 @@ util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
 u32 const kUsartBaud{2400};
 
-auto g_buttons = std::make_tuple(Button<Sym::kEsc>{{GPIOA, GPIO1}},
-                                 Button<Sym::kOk>{{GPIOA, GPIO3}},
-                                 Button<Sym::k0>{{GPIOA, GPIO4}},
-                                 Button<Sym::k1>{{GPIOA, GPIO5}},
-                                 Button<Sym::k2>{{GPIOA, GPIO6}},
-                                 Button<Sym::k3>{{GPIOA, GPIO7}});
+auto g_buttons = std::make_tuple(
+    Button<Sym::kEsc>{{GPIOA, GPIO1}}, Button<Sym::kOk>{{GPIOA, GPIO3}},
+    Button<Sym::k0>{{GPIOA, GPIO4}}, Button<Sym::k1>{{GPIOA, GPIO5}},
+    Button<Sym::k2>{{GPIOA, GPIO6}}, Button<Sym::k3>{{GPIOA, GPIO7}});
 
-constexpr const util::Io ir_input{GPIOA, GPIO0};
-constexpr const util::Io ir_output{GPIOB, GPIO6};
-constexpr const util::Io led_status{GPIOC, GPIO13};
-constexpr const util::Io led_fail{GPIOC, GPIO14};
-constexpr const util::Io usart_io{GPIOA, GPIO2};
+util::Io ir_input{GPIOA, GPIO0};
+util::Io ir_output{GPIOB, GPIO6};
+util::Io led_status{GPIOC, GPIO13};
+util::Io led_fail{GPIOC, GPIO14};
+util::Io usart_io{GPIOA, GPIO2};
 
 /*******************************************************************************
 
@@ -197,6 +195,10 @@ auto toggle = []() { gpio_toggle(led_status.port, led_status.pin); };
 struct RxState {};
 RxState g_rx_state{};
 
+auto EnterProgramming = [] {
+
+};
+
 auto FailProgramming = [] {};
 
 auto ResetSegTimer = [] {};
@@ -212,14 +214,12 @@ auto SaveCmd = [](RxState &state) {};
 struct RemoteStateTable {
   auto operator()() const {
     return sml::make_transition_table(
-        *Idle + sml::event<ButtonDown<Sym::kOk>> = SelectingProg,
-        SelectingProg + sml::event<ButtonDown<Sym::k0>> / SelectProg =
-            ProgIdle,
+        *Idle + sml::event<ButtonDown<Sym::kOk>> / EnterProgramming =
+            SelectingProg,
+        SelectingProg + sml::event<ButtonDown<Sym::k0>> / SelectProg = ProgIdle,
         ProgIdle + sml::event<IrEdge> / ResetSegTimer = CarrierRx,
-        ProgIdle + sml::event<ButtonDown<Sym::kOk>> / SaveProg =
-            CarrierRx,
-        ProgIdle + sml::event<ButtonDown<Sym::kEsc>> / SaveProg =
-            CarrierRx,
+        ProgIdle + sml::event<ButtonDown<Sym::kOk>> / SaveProg = CarrierRx,
+        ProgIdle + sml::event<ButtonDown<Sym::kEsc>> / SaveProg = CarrierRx,
         CarrierRx + sml::event<CarrierTimeout> / FailProgramming = ProgIdle,
         CarrierRx + sml::event<IrEdge> / SaveSeg = QuietRx,
         QuietRx + sml::event<IrEdge> / SaveSeg = CarrierRx,
@@ -239,7 +239,7 @@ RemoteState g_remote_state{g_rx_state};
  * due to bouncing.
  */
 template <typename ButtonT> void debounce_delay_block(ButtonT &button) {
-  u32 exti{util::GetExtiIrqn(button.io.pin).value()};
+  u32 exti{util::GetExti(button.io.pin).value()};
   exti_disable_request(exti);
   exti_reset_request(exti);
 
@@ -372,7 +372,7 @@ int main(void) {
   fault_setup();
   clock_setup();
   usart_setup();
-  gpio_setup(); // STUCK HERE
+  gpio_setup();
   buttons_setup();
   debounce_setup();
   ir_timers_setup();
@@ -382,7 +382,7 @@ int main(void) {
       __asm__("nop");
     }
     usart_send_blocking(USART2, 'b');
-    // gpio_toggle(led_status.port, led_status.pin);
+    gpio_toggle(led_status.port, led_status.pin);
   }
 
   return 0;

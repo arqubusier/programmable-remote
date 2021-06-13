@@ -14,6 +14,14 @@ constexpr const uint32_t KILO = 1000;
 
 namespace util {
 
+using Port = std::uint32_t;
+using Pin = std::uint16_t;
+
+struct Io {
+  Port port;
+  Pin pin;
+};
+
 #ifdef TEST
 #define TIM1 0
 #define TIM2 0
@@ -154,11 +162,6 @@ constexpr uint32_t ns2count(uint32_t frequency, uint32_t val_ns) {
 
   return static_cast<uint32_t>(val * frequency_ / divisor);
 }
-
-struct Io {
-  uint32_t port;
-  uint32_t pin;
-};
 
 /*
  * \brief Test wether the given time delta is within acceptable limit.
