@@ -72,7 +72,7 @@ constexpr std::pair<uint8_t, bool> GetTimerIrqn(uint32_t tim) {
   return {0, false};
 }
 
-constexpr std::optional<uint8_t> GetExti(uint32_t pin) {
+constexpr std::optional<uint8_t> GetExti(Pin pin) {
   switch (pin) {
   case GPIO0:
     return EXTI0;

@@ -348,7 +348,16 @@ void exti3_isr(void) { ProcessButton(std::get<1>(g_buttons), g_remote_state); }
 
 void exti4_isr(void) { ProcessButton(std::get<2>(g_buttons), g_remote_state); }
 
-void exti9_5_isr(void) { /* TODO use EXTI_PR to determine value */
+void exti9_5_isr(void) {
+  auto ProcessIfPending = [](auto button) {
+    if (exti_get_flag_status(util::GetExti(button.io.pin).value())) {
+      ProcessButton(button, g_remote_state);
+    }
+  };
+
+  ProcessIfPending(std::get<3>(g_buttons));
+  ProcessIfPending(std::get<4>(g_buttons));
+  ProcessIfPending(std::get<5>(g_buttons));
 }
 
 void exti10_15_isr(void) { /* unused */
