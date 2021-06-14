@@ -1,4 +1,4 @@
-* General
+* Design
 ** General algorihm
 Assume protocol has a series of bursts.
 For sensing, store length of every burst and space.
@@ -12,12 +12,27 @@ Timeout: assume time limit for section (burst or space)
 
 Limit on number of sections.
 
-** Clock
+** interfaces summary
 
-Three sources: internal, external, pll. Pll uses internal or external as a source and can multiply the frequency.
-Max sysclock for internal is 36mHz, max for external is 72 MHz. 
+See schema
 
-Default seems to be 36mHz -> internal?
+** Programs
+4 programs 0-9
+10 commands
+100 segments 16 bit (How are these stored? 32-bit aligned?)
+4*1000*2B = 8 KB
+Packing could reduce it
+
+** Recording
+
+Use a timer, diff-timer, to measure pulse lengths.
+When triggered follow sensing algorithm based on state machine.
+Compare elapsed duration since previous trigger and evaluate expected duration based on current state.
+If evaluation fails, goto backoff state of algorithm.
+Restart timer.
+
+Detect overlflow by checking UIF bit in TIMx_SR, URS bit must be set correctly.
+
 
 ** Timers
 
@@ -28,11 +43,64 @@ Default seems to be 36mHz -> internal?
 Total time = (counter*prescaler)/SYSCLK frequency
 prescaler = (total time*SYSCLK frequency)/countermax
 
-** Buttons
+*** Pulse lengths
+- Sequence timer
+- command timer (maybe reprogram sequence timer on the fly)
+- carrier timer
 
-0-9
-ok
-back
+16bit prescaler
+16bit counter
+
+16bit counter 2^16-1 = 65535
+
+RCC 72MHz
+ABP1 Max 36Mhz
+
+*** Command input handling
+Prescaler 10 Us period = 0.1 MHz = 100KHz: <=> 10e-6 * 65e3 = 650e-3 = max 650 ms counter
+Prescaler 2 us period =  0.5 MHz = 500KHz: <=> 2e-6 * 65e3 = 130e-3 = max 130 ms counter
+
++++ Prescaler 5 Us period = 0.2 MHz = 200KHz: <=> 5e-6 * 65e3 = 325e-3 = max 325 ms counter
+    set prescaler to ABP1*2/200e3 = 36e6/200e3 = 36e6/2e5 = 180
+
+ir sensor sensing pin is connected to GPIOA1.
+GPIO1A is configured to trigger interrupts. EXTI1.
+
+Start timer when ir sensor goes low. Then stop when goes high and save value.
+Interrupt on sensing pin.
+Start timer on falling edge interrupt, Stop timer and read value on rising endge interrupt.
+
+*** Carrier frequency
+
+To keep the phase of the carrier pulse, start timer at beginning of command and keep it running until the end.
+Control the carrier pulse output by enabling/disabling the output.
+A separate timer is used for the carrier pulse.
+
+38kHz ca 0.23 us
+Use toggle output of timer.
+The output toggles at double frequency 76Khz.
+Use approximation for the period
+0.013157894736842105263157894736842105263157894736842105263... ms
+13.157894736842105263157894736842105263157894736842105263... us
+
+no prescaler:
+13.1578947us/(1/36Mhz) = 13.1578947us*36Mhz = 13.1578947*36 = 473.682 
+474 * (1/36MHz) = 474*(1/36)us = 13.16666... us
+
+Use upcounting mode TIMx_CR1, TIMx_CR2
+Use continuous mode (not One-pulse mode)
+autoreload 947 TIMx_ARR, TIMx_CR1, TIMx_CR2
+compare 947 TIMx_CCRx, disable preload OCxPE bit in the TIMx_CCMRx register
+output toggle mode, OCxM bits in the TIMx_CCMRx register (OCxM=011)
+disable interrupt (CCXIE bit in the TIMx_DIER register)
+disable dma (CCxDE bit in the TIMx_DIER register)
+**** TODO Use TIM1 for higher precision? 72Mhz vs 36Mhz
+     Cannot get it to work.
+works for TIM2 and TIM3.
+Tim1 uses ABP2 Different config needed?
+Tim1 has extra features? which? different config needed?
+
+*** Button debounce timer
 
 bounce ca 5ms
 
@@ -44,26 +112,34 @@ set prescaler to 6 ->
 counter = 5ms * 72 MHz/6 = 60'000
 
 
-*** Repeat message/multiple messages
+** Buttons
 
-** IR Communication
+0-9
+ok
+back
+
+* Knowledge
+** IR Protocols
 diode frequencies:
 
 *** PWM-based
-38kHz common signal to use for pulses.
 
 http://irdb.tk/find/
 
 **** NEC
+38kHz
 8 bit address, 8 bit inverse address, 8bit command, 8bit inverse command
 https://techdocs.altium.com/display/FPGA/NEC+Infrared+Transmission+Protocol
 **** NEC2
+38kHz
 https://www.sbprojects.net/knowledge/ir/nec.php
 16 bit address, 16bit command
 
 **** Epson projector
+38kHz
 Protocol NEC2
 **** Harman Kardon
+38kHz
 Harman Kardon Receivers: Protocol Emerson device 40 subdevice -1
 Harman Kardon Receivers: Protocol NEC device 128 subdevice 112
 Harman Kardon Receivers: Protocol NEC1 device 4 subdevice -1
@@ -99,6 +175,21 @@ carrier 587 us - 625 us
 *** OSSC
 carrier 562 us - 612 us
 ** Components
+*** Stm32f103c8t6
+**** Constraints
+***** Memory
+stm32f103c8t6
+
+SRAM 10KiB
+Flash 64KiB
+
+**** Clock
+
+Three sources: internal, external, pll. Pll uses internal or external as a source and can multiply the frequency.
+Max sysclock for internal is 36mHz, max for external is 72 MHz. 
+
+Default seems to be 36mHz -> internal?
+
 *** IR diode
 *** IR receiver
 https://www.electrokit.com/uploads/productfile/41015/41015734_-_IR_Receiver_Module.pdf
@@ -122,15 +213,12 @@ DRAW DIAGRAM.
 
 Sens signals from remote when programming.
 
-** Components
-- Bluepill devboard.
-- ir sensor.
-- ir led.
-- keyboard matrix
-- leds (yellow, green, red)
-- (display)
-  
+*** Serial EEPROM
+*** Buttons
+*** display
+*** leds
 ** IR NEC Timings
+
 Bit Pulse length 560us
 
 [[./necmodulation.png]]
@@ -140,80 +228,7 @@ Bit Pulse length 560us
 Max duration 100 ms, repeat distance.
 Min 560us
 
-*** Pulse lengths
-- Sequence timer
-- command timer (maybe reprogram sequence timer on the fly)
-- carrier timer
-
-16bit prescaler
-16bit counter
-
-16bit counter 2^16-1 = 65535
-
-RCC 72MHz
-ABP1 Max 36Mhz
-
-*** Command input handling
-Prescaler 10 Us period = 0.1 MHz = 100KHz: <=> 10e-6 * 65e3 = 650e-3 = max 650 ms counter
-Prescaler 2 us period =  0.5 MHz = 500KHz: <=> 2e-6 * 65e3 = 130e-3 = max 130 ms counter
-
-+++ Prescaler 5 Us period = 0.2 MHz = 200KHz: <=> 5e-6 * 65e3 = 325e-3 = max 325 ms counter
-    set prescaler to ABP1*2/200e3 = 36e6/200e3 = 36e6/2e5 = 180
-
-ir sensor sensing pin is connected to GPIOA1.
-GPIO1A is configured to trigger interrupts. EXTI1.
-
-Start timer when ir sensor goes low. Then stop when goes high and save value.
-Interrupt on sensing pin.
-Start timer on falling edge interrupt, Stop timer and read value on rising endge interrupt.
-
-
-*** Carrier frequency
-
-To keep the phase of the carrier pulse, start timer at beginning of command and keep it running until the end.
-Control the carrier pulse output by enabling/disabling the output.
-A separate timer is used for the carrier pulse.
-
-38kHz ca 0.23 us
-Use toggle output of timer.
-The output toggles at double frequency 76Khz.
-Use approximation for the period
-0.013157894736842105263157894736842105263157894736842105263... ms
-13.157894736842105263157894736842105263157894736842105263... us
-
-no prescaler:
-13.1578947us/(1/36Mhz) = 13.1578947us*36Mhz = 13.1578947*36 = 473.682 
-474 * (1/36MHz) = 474*(1/36)us = 13.16666... us
-
-Use upcounting mode TIMx_CR1, TIMx_CR2
-Use continuous mode (not One-pulse mode)
-autoreload 947 TIMx_ARR, TIMx_CR1, TIMx_CR2
-compare 947 TIMx_CCRx, disable preload OCxPE bit in the TIMx_CCMRx register
-output toggle mode, OCxM bits in the TIMx_CCMRx register (OCxM=011)
-disable interrupt (CCXIE bit in the TIMx_DIER register)
-disable dma (CCxDE bit in the TIMx_DIER register)
-**** TODO Use TIM1 for higher precision? 72Mhz vs 36Mhz
-     Cannot get it to work.
-works for TIM2 and TIM3.
-Tim1 uses ABP2 Different config needed?
-Tim1 has extra features? which? different config needed?
-
-
-** Sensing
-
-Use a timer, diff-timer, to measure pulse lengths.
-When triggered follow sensing algorithm based on state machine.
-Compare elapsed duration since previous trigger and evaluate expected duration based on current state.
-If evaluation fails, goto backoff state of algorithm.
-Restart timer.
-
-Detect overlflow by checking UIF bit in TIMx_SR, URS bit must be set correctly.
-
-* TODO Figure out why this basic calculation yields wrong result
-
-  uint32_t b  = (rcc_apb1_frequency * 2);
-
-* DONE Weird timings_ values
+* DONE Weird timings_ values                                        :ARCHIVE:
 prescaler 360:
 $96 = {796, 897, 118, 109, 118, 109, 118, 334, 118, 109, 112, 114, 118, 109, 113, 114, 113, 339, 118, 109, 118, 109, 112, 340, 113, 114, 113, 340, 113, 340, 113, 340, 118, 108, 118, 108, 112, 114, 118, 109, 118, 108, 118, 334, 113, 114, 117, 109, 113, 340, 113, 340, 117, 335, 112, 340, 113, 340, 113, 114, 112, 340, 113, 340, 113, 114, 113, 0 <repeats 33 times>}
 
@@ -225,8 +240,7 @@ prescaler 100:
 $95 = {416, 200, 422, 384, 420, 384, 399, 212, 401, 404, 420, 384, 400, 405, 401, 403, 420, 191, 419, 387, 400, 405, 399, 212, 418, 386, 399, 211, 400, 211, 400, 211, 400, 405, 400, 406, 418, 386, 417, 386, 419, 384, 399, 211, 400, 404, 399, 405, 400, 210, 399, 211, 400, 212, 420, 190, 419, 194, 401, 405, 400, 210, 420, 192, 421, 384, 399, 0 <repeats 33 times>}
 
 Had not set period, so counter was looping to early.
-
-* TODO Synchronize Multiple interrupts and main thread.
+* TODO Synchronize Multiple interrupts and main thread.             :ARCHIVE:
 
 Use interrupt priorities.
 
@@ -246,7 +260,8 @@ We have main thread and a number of interrupts:
 set delay timer lower prio, can still be tail-chained
 
 delay timer can come first, then be preempted
-* TODO Button circuit
+
+* TODO Button circuit                                               :ARCHIVE:
 10 buttons
 
 ** direct conncetion: 10 gpio internal pulldown, 1 common high connection.
@@ -260,7 +275,12 @@ debouncing: use general synchronization method, interrupt disabling.
 ** Keypad
 ** Swithes
 
-* TODO Hangs in constructor
+* Problems
+** TODO Figure out why this basic calculation yields wrong result
+
+  uint32_t b  = (rcc_apb1_frequency * 2);
+
+** TODO Hangs in constructor                                        :ARCHIVE:
 
 in statemachine.hpp:52
           command_index_{0}, program_index_{program_index} {}
@@ -311,49 +331,14 @@ user fault, invalid state. no idea why.
 $22 = 0x8001ae9
  Uneven address???
 
-** Soloution
+*** Soloution
 Redesign, global variable, or pass around reference to common state instead of composition.
 
 global variable
  + easy to implement
  + can still change it in test
  - hidden state 
-
-* interfaces summary
-ir in
-ir out
-buttons
-| type    | required ports |  Vdd [V] | Vss | Actual ports |
-|---------+----------------+----------+-----+--------------|
-| ir in   | 1 gpio         |      3.3 |     | B0           |
-|---------+----------------+----------+-----+--------------|
-| ir out  | 1 gpio TIM     |      3.3 |     | A0           |
-|---------+----------------+----------+-----+--------------|
-| buttons | 12 gpio ETXI   |      3.3 |     | A1-A12       |
-|---------+----------------+----------+-----+--------------|
-| screen  | scl            | 3.3 or 5 |     | PB6          |
-|         | sda            |          |     | PB7          |
-
-** Programs
-10 programs 0-9
-10 commands
-100 segments 16 bit (How are these stored? 32-bit aligned?)
-2*10e4B = 20 KiB -- Too Big!
-
-10KiB
-
-reduce array lengths
-
-
-* Constraints
-** Memory
-stm32f103c8t6
-
-SRAM 20KiB
-Flash 64KiB
-
-* Problems
-** Following hangs
+** Following hangs                                                  :ARCHIVE:
 
 using Buttons = std::array<util::Io, kNumButtons>;
 //global variable
@@ -367,6 +352,10 @@ for (const auto &button : buttons) {
   uint32_t exti{util::GetExtiIrqn(button.pin_).value()};
 }
 
-** Debounce timer works for tim3 but not tim5
+** Debounce timer works for tim3 but not tim5                       :ARCHIVE:
 
 commit 8a56048e89eca8753037eba329801153a9f771ca
+
+*** Solution
+
+stm32f103c8t6 only has timers 1-4
