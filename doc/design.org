@@ -65,10 +65,17 @@ max period Nec2, address all ones:
 choose value closer to longest required pulse: 9 ms (NEC)
 20 ms.
 
-prescaler = 20ms * 72 MHz/65535 = 21.97   
+prescaler = 20ms * 72 MHz/65535 = 21.97
+period = 22/72Mhz
 
 set prescaler to 22 -> timeout slightly larger than 20ms
 65535*(22/72Mhz) = 0.0200245833... s
+
+1st = 9000 us ~ 29455
+2nd = 4500 us ~ 14727
+short pulse = 560 us, 560e-6/(22/(72e6)) = 560*72/22 ~ 1833 counter
+long pulse = (2250-560) us = 1690,  1690*72/22 ~ 5531 counter
+
 
 Start timer when ir sensor goes low. Then stop when goes high and save value.
 Interrupt on sensing pin.
@@ -165,6 +172,17 @@ Harman Kardon Receivers: Protocol RCA-38 device 7 subdevice -1
 carrier 587 us - 560us
 
 OK 7484 6f90
+
+**** osd menu
+
+0-7   k k k l k k k k  0100  4 
+8-15  k k k k k k k l  0001  1
+16-23 k k k l k k k k  0100  4
+24-31 k l k l k l k k  1110  E
+32-39 k k k k k l k l  0011  3
+40-47 k l k k k l k k  1010  a
+48-55 k l k l k k k k  1100  c
+56-63 k k k l k k k l  0101  5
 
 
 
@@ -285,68 +303,67 @@ debouncing: use general synchronization method, interrupt disabling.
 
   uint32_t b  = (rcc_apb1_frequency * 2);
 
-** TODO Hangs in constructor                                        :ARCHIVE:
+**TODO Hangs in constructor : ARCHIVE :
 
-in statemachine.hpp:52
-          command_index_{0}, program_index_{program_index} {}
-      
+    in statemachine.hpp : 52 command_index_{0},
+    program_index_{program_index} {}
+
 calls memcpy and hangs in loop 0x08004198-0x080041a2
 
 
 Dump of assembler code for function memcpy:
    0x0800418a <+0>:	add	r2, r1
-;r0             0x200000d8          536871128
-;r1             0x200027e8          536881128
-;r2             0x20004fd4          536891348
-   0x0800418c <+2>:	cmp	r1, r2
-=> 0x0800418e <+4>:	add.w	r3, r0, #4294967295	; 0xffffffff destination address
-;r3             0x200000d7          536871127
-   0x08004192 <+8>:	bne.n	0x8004196 <memcpy+12>
-;r4             0x200000d8          536871128
-;lr             0x80019fd           134224381
-   0x08004194 <+10>:	bx	lr
-   0x08004196 <+12>:	push	{r4, lr}
-   0x08004198 <+14>:	ldrb.w	r4, [r1], #1 ;postincrement r1
-   0x0800419c <+18>:	cmp	r1, r2
-   0x0800419e <+20>:	strb.w	r4, [r3, #1]! ;preincrement r3
-   0x080041a2 <+24>:	bne.n	0x8004198 <memcpy+14>
-   0x080041a4 <+26>:	pop	{r4, pc}
- 
+;
+r0 0x200000d8 536871128;
+r1 0x200027e8 536881128;
+r2 0x20004fd4 536891348 0x0800418c < +2 > : cmp r1,
+    r2 = > 0x0800418e < +4 > : add.w r3, r0, #4294967295;
+0xffffffff destination address;
+r3 0x200000d7 536871127 0x08004192 < +8 > : bne.n 0x8004196 < memcpy + 12 > ;
+r4 0x200000d8 536871128;
+lr 0x80019fd 134224381 0x08004194 < +10 > : bx lr 0x08004196 < +12 > : push {
+  r4, lr
+}
+0x08004198 < +14 > : ldrb.w r4, [r1], #1;
+postincrement r1 0x0800419c < +18 > : cmp r1, r2 0x0800419e < +20 > : strb.w r4,
+    [ r3, #1 ] !;
+preincrement r3 0x080041a2 < +24 > : bne.n 0x8004198 < memcpy + 14 >
+    0x080041a4 < +26 > : pop{r4, pc}
 
+                         memcpy 536891348 -
+                         536881128 10220 elements 2 * 100 * 10 *
+                             5
 
-memcpy
-536891348-536881128
-10220 elements
-2*100*10*5
+                             does it fit in destination
+    ? ;
+r3 0x200000d7 536871127 536871127 +
+    10219 = 536881346 = 0x200028c2 0x200000d7 - 0x200028c2 > 0x200027e8
 
-does it fit in destination?
-;r3             0x200000d7          536871127
-536871127+10219=536881346=0x200028c2
-0x200000d7 - 0x200028c2 > 0x200027e8
+                        too many bytes
+    ? src,
+    return addresses cause problems
+    ?
 
+    hard_faults,
+    CFSR == 0x20000 user fault,
+    invalid state.no idea why.
 
-too many bytes?
-src,return addresses cause problems?
+        (gdb)p
+        / x pc $22 = 0x8001ae9 Uneven address
+    ? ? ?
 
+        ***Soloution Redesign,
+    global variable,
+    or pass around reference to common state instead of composition.
 
-hard_faults, CFSR == 0x20000
-user fault, invalid state. no idea why.
+            global variable
+            + easy to implement + can still change it in test
+            - hidden state **Following hangs
+    : ARCHIVE
+    :
 
-(gdb) p/x pc
-$22 = 0x8001ae9
- Uneven address???
-
-*** Soloution
-Redesign, global variable, or pass around reference to common state instead of composition.
-
-global variable
- + easy to implement
- + can still change it in test
- - hidden state 
-** Following hangs                                                  :ARCHIVE:
-
-using Buttons = std::array<util::Io, kNumButtons>;
-//global variable
+    using Buttons = std::array<util::Io, kNumButtons>;
+// global variable
 // note double outer braces
 // if single outer braces are used the problem disappears
 constexpr Buttons buttons{{
@@ -364,3 +381,30 @@ commit 8a56048e89eca8753037eba329801153a9f771ca
 *** Solution
 
 stm32f103c8t6 only has timers 1-4
+
+* Example
+
+** osd/menu harman cardon
+
+ 
+ {
+  prog_i = 0, cmd = {
+    data_ = {_M_elems = {29462, 14780, 1844, 1841,
+                         1838,  1841,  1836, 5550,
+                         1844,  1839,  1838, 1838,
+                         1836,  1841,  1837, 1841,
+                         1833,  5548,  1845, 1842,
+                         1839,  1840,  1837, 5549,
+                         1838,  1841,  1836, 5551,
+                         1839,  5548,  1838, 5551,
+                         1840,  1839,  1835, 5548,
+                         1839,  5554,  1837, 5548,
+                         1842,  1841,  1834, 5553,
+                         1836,  5552,  1835, 5551,
+                         1841,  1843,  1835, 1842,
+                         1838,  1840,  1836, 1839,
+                         1834,  5555,  1839, 1837,
+                         1838,  1840,  1836, 1842,
+                         1833,  5549,  1837, 0 < repeats 33 times > }},
+    size = 67
+  }

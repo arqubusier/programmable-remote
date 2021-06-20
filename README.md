@@ -50,6 +50,11 @@ Build and flash:
 
 DOES NOT WORK
   root@mycontainer make -C src && echo "program src/programmable-remote.elf verify reset" | telnet localhost 4444
+  
+  reset halt
+  stm32f1x mass_erase 0
+  flash write_bank 0 src/programmable-remote.bin 0
+  reset halt
 
 ## Debug with openocd and gdb
 

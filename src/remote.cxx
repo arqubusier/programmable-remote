@@ -257,6 +257,7 @@ auto SaveSeg = [](RxState &state) {
   state.cmd.Append(timer_get_counter(kCommandTimer.tim_));
   timer_set_counter(kCommandTimer.tim_, 0);
   timer_enable_counter(kCommandTimer.tim_);
+  gpio_toggle(led_status.port, led_status.pin);
 };
 
 auto SaveCmd = [](RxState &state) { state.prog.Append(state.cmd); };
@@ -447,7 +448,6 @@ int main(void) {
       __asm__("nop");
     }
     usart_send_blocking(USART2, 'b');
-    gpio_toggle(led_status.port, led_status.pin);
   }
 
   return 0;
