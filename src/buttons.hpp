@@ -3,6 +3,7 @@
 
 #include "util.hpp"
 #include "util_libopencm3.hpp"
+#include <optional>
 #include <tuple>
 
 using u16 = util::u16;
@@ -10,11 +11,31 @@ using u32 = util::u32;
 using u8 = util::u8;
 
 enum struct ButtonState { kUp, kBouncingDown, kBouncingUp, kDown };
-enum struct Sym { k0, k1, k2, k3, k4, k5, k6, kEsc, kOk };
+using SymInt = u16;
+enum struct Sym : SymInt { k0, k1, k2, k3, k4, k5, k6, kEsc, kOk };
+
+SymInt constexpr Sym2Index(Sym const sym) {
+  SymInt res{};
+  switch (sym) {
+  case Sym::k0:
+  case Sym::k1:
+  case Sym::k2:
+  case Sym::k3:
+  case Sym::k4:
+  case Sym::k5:
+  case Sym::k6:
+    res = static_cast<SymInt>(sym);
+  case Sym::kEsc:
+  case Sym::kOk:
+  default:;
+
+    // TODO: abort
+  }
+  return res;
+}
 
 template <Sym symbolV> struct Button {
-  constexpr Button(util::Io const& io) : io{io}, state{ButtonState::kUp} {
-  }
+  constexpr Button(util::Io const &io) : io{io}, state{ButtonState::kUp} {}
   util::Io const io;
   ButtonState state;
   constexpr static Sym GetSym() { return symbolV; }

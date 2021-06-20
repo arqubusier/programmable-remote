@@ -57,14 +57,18 @@ RCC 72MHz
 ABP1 Max 36Mhz
 
 *** Command input handling
-Prescaler 10 Us period = 0.1 MHz = 100KHz: <=> 10e-6 * 65e3 = 650e-3 = max 650 ms counter
-Prescaler 2 us period =  0.5 MHz = 500KHz: <=> 2e-6 * 65e3 = 130e-3 = max 130 ms counter
 
-+++ Prescaler 5 Us period = 0.2 MHz = 200KHz: <=> 5e-6 * 65e3 = 325e-3 = max 325 ms counter
-    set prescaler to ABP1*2/200e3 = 36e6/200e3 = 36e6/2e5 = 180
+min period 9ms (start bit)
+max period Nec2, address all ones: 
+9000 + 4500 + 16*2250 + 16*(2250+1120)/2 + 560 [us] = 77020 [us] ~ 77 ms
 
-ir sensor sensing pin is connected to GPIOA1.
-GPIO1A is configured to trigger interrupts. EXTI1.
+choose value closer to longest required pulse: 9 ms (NEC)
+20 ms.
+
+prescaler = 20ms * 72 MHz/65535 = 21.97   
+
+set prescaler to 22 -> timeout slightly larger than 20ms
+65535*(22/72Mhz) = 0.0200245833... s
 
 Start timer when ir sensor goes low. Then stop when goes high and save value.
 Interrupt on sensing pin.
@@ -122,6 +126,7 @@ back
 ** IR Protocols
 diode frequencies:
 
+longest pulse: 9ms (NEC)
 *** PWM-based
 
 http://irdb.tk/find/

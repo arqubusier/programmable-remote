@@ -11,6 +11,8 @@
 
 #include "boost/sml.hpp"
 #include "buttons.hpp"
+#include "program.hpp"
+#include "stm32f1_hal.hpp"
 #include "util.hpp"
 #include "util_libopencm3.hpp"
 
@@ -46,6 +48,7 @@ util::Timer input_inter_segment_timer{
 util::Timer output_inter_segment_timer{
     TIM4, TIM_OC1, input_inter_segment_prescaler,
     util::ns2count(input_inter_segment_timer_freq, 24 * MEGA)};
+util::Timer const kCommandTimer{TIM2, TIM_OC1, 22 - 1, 0xFFFF};
 util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
 u32 const kUsartBaud{2400};
@@ -145,6 +148,32 @@ void buttons_setup() {
 }
 
 /**
+ * Configure the command timer.
+ */
+void command_timer_setup() {
+  util::Timer const &timer = kCommandTimer;
+
+  rcc_periph_clock_enable(util::GetTimerRccPeriphClken(timer.tim_).first);
+  // Reset timer peripheral to defaults.
+  rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(timer.tim_).first);
+
+  timer_disable_counter(timer.tim_);
+  timer_set_mode(timer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
+                 TIM_CR1_DIR_UP);
+  timer_one_shot_mode(timer.tim_);
+  timer_enable_preload(timer.tim_);
+  timer_enable_update_event(timer.tim_);
+  timer_update_on_overflow(timer.tim_);
+  timer_set_prescaler(timer.tim_, timer.prescaler_);
+  timer_set_period(timer.tim_, timer.period_);
+  // force update of auto-reload register
+  timer_generate_event(timer.tim_, TIM_EGR_UG);
+
+  nvic_enable_irq(util::GetTimerIrqn(timer.tim_).first);
+  timer_enable_irq(timer.tim_, TIM_DIER_UIE);
+}
+
+/**
  * Configure the debounce timer.
  */
 void debounce_setup() {
@@ -178,8 +207,12 @@ void ir_timers_setup() {}
 StateMachine
 
 *******************************************************************************/
-template <Sym> struct ButtonDown {};
-template <Sym> struct ButtonUp {};
+template <Sym sym> struct ButtonDown {
+  constexpr static Sym GetSym() { return sym; };
+};
+template <Sym sym> struct ButtonUp {
+  constexpr static Sym GetSym() { return sym; };
+};
 struct NoEvent {};
 struct IrEdge {};
 struct CarrierTimeout {};
@@ -190,10 +223,16 @@ auto ProgIdle = sml::state<class ProgIdle>;
 auto CarrierRx = sml::state<class CarrierRx>;
 auto QuietRx = sml::state<class QuietRx>;
 auto CmdOk = sml::state<class CmdOk>;
-auto toggle = []() { gpio_toggle(led_status.port, led_status.pin); };
 
-struct RxState {};
+struct RxState {
+  u16 prog_i{0};
+  Cmd cmd{};
+  Program prog{};
+};
+
 RxState g_rx_state{};
+
+auto IsCmdFull = [](RxState &state) -> bool { return state.cmd.IsFull(); };
 
 auto EnterProgramming = [] {
 
@@ -201,15 +240,26 @@ auto EnterProgramming = [] {
 
 auto FailProgramming = [] {};
 
-auto ResetSegTimer = [] {};
+auto ResetSegTimer = [] {
+  timer_set_counter(kCommandTimer.tim_, 0);
+  timer_enable_counter(kCommandTimer.tim_);
+};
 
-auto SelectProg = [](RxState &state, auto event) {};
+auto SelectProg = [](RxState &state, auto event) {
+  state.cmd.Reset();
+  state.prog.Reset();
+  state.prog_i = Sym2Index(event.GetSym());
+};
 
 auto SaveProg = [](RxState &state) {};
 
-auto SaveSeg = [](RxState &state) {};
+auto SaveSeg = [](RxState &state) {
+  state.cmd.Append(timer_get_counter(kCommandTimer.tim_));
+  timer_set_counter(kCommandTimer.tim_, 0);
+  timer_enable_counter(kCommandTimer.tim_);
+};
 
-auto SaveCmd = [](RxState &state) {};
+auto SaveCmd = [](RxState &state) { state.prog.Append(state.cmd); };
 
 struct RemoteStateTable {
   auto operator()() const {
@@ -220,10 +270,12 @@ struct RemoteStateTable {
         ProgIdle + sml::event<IrEdge> / ResetSegTimer = CarrierRx,
         ProgIdle + sml::event<ButtonDown<Sym::kOk>> / SaveProg = CarrierRx,
         ProgIdle + sml::event<ButtonDown<Sym::kEsc>> / SaveProg = CarrierRx,
-        CarrierRx + sml::event<CarrierTimeout> / FailProgramming = ProgIdle,
+        CarrierRx + sml::event<CarrierTimeout> / FailProgramming = Idle,
         CarrierRx + sml::event<IrEdge> / SaveSeg = QuietRx,
+        CarrierRx + sml::event<IrEdge>[IsCmdFull] / FailProgramming = QuietRx,
         QuietRx + sml::event<IrEdge> / SaveSeg = CarrierRx,
-        QuietRx + sml::event<CmdTimeout> = CmdOk,
+        QuietRx + sml::event<CmdTimeout> / SaveCmd = CmdOk,
+        QuietRx + sml::event<IrEdge>[IsCmdFull] / FailProgramming = QuietRx,
         CmdOk + sml::event<ButtonDown<Sym::kOk>> / SaveCmd = ProgIdle,
         CmdOk + sml::event<ButtonDown<Sym::kEsc>> = ProgIdle);
   }
@@ -241,6 +293,7 @@ RemoteState g_remote_state{g_rx_state};
 template <typename ButtonT> void debounce_delay_block(ButtonT &button) {
   u32 exti{util::GetExti(button.io.pin).value()};
   exti_disable_request(exti);
+  // TODO: clear nvic pending
   exti_reset_request(exti);
 
   timer_set_counter(kDebounceTimer.tim_, 0);
@@ -367,9 +420,7 @@ void exti9_5_isr(void) {
 void exti10_15_isr(void) { /* unused */
 }
 
-void tim3_isr(void) {}
-
-void tim4_isr(void) {}
+void tim2_isr(void) { g_remote_state.process_event(CmdTimeout{}); }
 
 } // extern "C"
 
@@ -387,6 +438,7 @@ int main(void) {
   usart_setup();
   gpio_setup();
   buttons_setup();
+  command_timer_setup();
   debounce_setup();
   ir_timers_setup();
   while (1) {
