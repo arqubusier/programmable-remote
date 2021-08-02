@@ -265,6 +265,7 @@ auto SaveCmd = [](RxState &state) { state.prog.Append(state.cmd); };
 struct RemoteStateTable {
   auto operator()() const {
     return sml::make_transition_table(
+        // Rx
         *Idle + sml::event<ButtonDown<Sym::kOk>> / EnterProgramming =
             SelectingProg,
         SelectingProg + sml::event<ButtonDown<Sym::k0>> / SelectProg = ProgIdle,
@@ -278,7 +279,10 @@ struct RemoteStateTable {
         QuietRx + sml::event<CmdTimeout> / SaveCmd = CmdOk,
         QuietRx + sml::event<IrEdge>[IsCmdFull] / FailProgramming = QuietRx,
         CmdOk + sml::event<ButtonDown<Sym::kOk>> / SaveCmd = ProgIdle,
-        CmdOk + sml::event<ButtonDown<Sym::kEsc>> = ProgIdle);
+        CmdOk + sml::event<ButtonDown<Sym::kEsc>> = ProgIdle
+        // Tx
+
+    );
   }
 };
 

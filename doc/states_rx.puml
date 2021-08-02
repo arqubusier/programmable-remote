@@ -1,0 +1,21 @@
+@startuml
+[*] -> Idle
+Idle --> SelectProg : Down(Ok)
+SelectProg --> ProgramIdle: Down(N)\n/prog=N, seg=0, cmd=0
+SelectProg --> Idle: Down(Esc)
+
+ProgramIdle --> Idle : Down(Ok), Down(Esc)
+ProgramIdle --> CarrierRx: Toggle(IrIn)\n/ Reset RxT
+ProgramIdle: enter/ RxT = 0
+
+CarrierRx --> QuietRx: Toggle(IrIn)\n/ segments[seg] = RxT.val,\nReset RxT
+CarrierRx --> Idle: Timeout(RxT)\n/ clear last command,\nshow error
+CarrierRx --> Idle: Toggle(IrIn) [cmd full] \n/show error
+QuietRx --> Idle: Toggle(IrIn) [cmd full] \n/show error
+QuietRx --> CarrierRx: Toggle(IrIn)\n/ segments[seg] = RxT.val,\nReset RxT
+QuietRx -> CommandOk: Timeout(RxT)\n/ Programs[prog][cmd] = segments,\nshow succes
+CommandOk -> ProgramIdle: Down(Ok)\n/ save last command, cmd++
+CommandOk -> ProgramIdle: Down(Esc)\n/ clear last command
+CommandOk -[hidden]-> SelectProg
+
+@enduml

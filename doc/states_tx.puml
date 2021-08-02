@@ -1,0 +1,32 @@
+@startuml
+[*] --> Idle
+Idle --> LoadingProgram : Down(ProgN) \n/ StartLoad(ProgN, prog), cmd_i = 0
+LoadingProgram --> ChoosingFirstCommand : LoadComplete
+ChoosingFirstCommand : OnEntry/  GetNextNonEmptyCmd()
+ChoosingFirstCommand --> Idle : [IsProgComplete(state)]
+ChoosingFirstCommand --> Tx : [!IsProgComplete(state)]
+ChoosingNextCommand : OnEntry/  GetNextNonEmptyCmd()
+ChoosingNextCommand --> Idle : [IsProgComplete(state)]
+ChoosingNextCommand --> WaitingBetweenCommands : [!IsProgramComplete(state)] \n/ Start SegT(Inter command time)
+WaitingBetweenCommands  --> Tx : Timeout(SegT)
+
+State Tx {
+[*] -> CarrierTx
+CarrierTx --> QuietTx : Timeout(SegT)\n[!IsCommandCompleted(state)]
+CarrierTx : onEntry/ Enable carrier,\nStartNextSegment(state)
+QuietTx --> CarrierTx : Timeout(SegT)\n[!IsCommandCompleted(state)]
+QuietTx : onEntry/ Disable carrier,\nStartNextSegment(state)
+}
+Tx --> ChoosingNextCommand : Timeout(SegT) [IsCommandCompleted(state)]
+Tx --> Idle : Down(Esc)
+
+State Functions {
+IsCommandCompleted: return (seg_i < cmd.size()));
+IsCommandCompleted -[hidden]-> IsProgComplete
+IsProgComplete: return (cmd_i >= prog.Size());
+StartNextSegment: Start SegT with cmd[seg_i++]
+GetNextNonEmptyCmd: iterate through prog starting at cmd_i by advancing cmd_i.\nStop when a non-empty command or the end of prog is found.
+}
+
+
+@enduml
