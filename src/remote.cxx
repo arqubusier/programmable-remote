@@ -64,6 +64,14 @@ util::Io led_status{GPIOC, GPIO13};
 util::Io led_fail{GPIOC, GPIO14};
 util::Io usart_io{GPIOA, GPIO2};
 
+struct State {
+  u16 prog_i{0};
+  u16 cmd_i{0};
+  u16 seq_i{0};
+  Cmd cmd{};
+  Program prog{};
+};
+State g_state{};
 /*******************************************************************************
 
 Setup
@@ -213,54 +221,84 @@ template <Sym sym> struct ButtonDown {
 template <Sym sym> struct ButtonUp {
   constexpr static Sym GetSym() { return sym; };
 };
+
+/* Events */
 struct NoEvent {};
 struct IrEdge {};
 struct CarrierTimeout {};
 struct CmdTimeout {};
+struct LoadDone {};
+
+/* States */
 auto Idle = sml::state<class Idle>;
 auto SelectingProg = sml::state<class SelectProg>;
 auto ProgIdle = sml::state<class ProgIdle>;
 auto CarrierRx = sml::state<class CarrierRx>;
 auto QuietRx = sml::state<class QuietRx>;
 auto CmdOk = sml::state<class CmdOk>;
+auto LoadingProg = sml::state<class LoadingProg>;
+auto ChoosingFirstCmd = sml::state<class ChoosingFirstCmd>;
+auto CarrierTx = sml::state<class CarrierTx>;
+auto QuietTx = sml::state<class QuietTx>;
+auto ChoosingNextCmd = sml::state<class ChoosingNextCmd>;
+auto WaitingForNextCmd = sml::state<class WaitingForNextCmd>;
 
-struct RxState {
-  u16 prog_i{0};
-  Cmd cmd{};
-  Program prog{};
-};
+/* Actions and guards */
 
-RxState g_rx_state{};
-
-auto IsCmdFull = [](RxState &state) -> bool { return state.cmd.IsFull(); };
-
-auto EnterProgramming = [] {
-
-};
-
+auto IsCmdFull = [](State &state) -> bool { return state.cmd.IsFull(); };
+auto EnterProgramming = [] {};
 auto FailProgramming = [] {};
+auto SaveProg = [](State &state) {};
 
 auto ResetSegTimer = [] {
   timer_set_counter(kCommandTimer.tim_, 0);
   timer_enable_counter(kCommandTimer.tim_);
 };
 
-auto SelectProg = [](RxState &state, auto event) {
+auto SelectProg = [](State &state, auto event) {
   state.cmd.Reset();
   state.prog.Reset();
   state.prog_i = Sym2Index(event.GetSym());
 };
 
-auto SaveProg = [](RxState &state) {};
-
-auto SaveSeg = [](RxState &state) {
+auto SaveSeg = [](State &state) {
   state.cmd.Append(timer_get_counter(kCommandTimer.tim_));
   timer_set_counter(kCommandTimer.tim_, 0);
   timer_enable_counter(kCommandTimer.tim_);
   gpio_toggle(led_status.port, led_status.pin);
 };
 
-auto SaveCmd = [](RxState &state) { state.prog.Append(state.cmd); };
+auto SaveCmd = [](State &state) { state.prog.Append(state.cmd); };
+auto EnableCarrier = []() {};
+auto DisableCarrier = []() {};
+auto StartNextSegment = [](State &state) {};
+auto GetNextNonEmptyCmd = [](State &state) {};
+auto StartInterCmd = [](State &state) {};
+auto LoadProg = [](State &state) {};
+auto IsNotCmdDone = [](State &state) -> bool { return true; };
+auto IsCmdDone = [](State &state) -> bool { return true; };
+auto IsProgDone = [](State &state) -> bool { return true; };
+auto IsNotProgDone = [](State &state) -> bool { return true; };
+
+/* State machines */
+
+struct Tx {
+  auto operator()() const {
+    return sml::make_transition_table(
+        *CarrierTx + sml::on_entry<sml::_> /
+                         [](State &state) {
+                           EnableCarrier();
+                           StartNextSegment(state);
+                         },
+        CarrierTx + sml::event<CarrierTimeout>[IsNotCmdDone] = QuietTx,
+        *QuietTx + sml::on_entry<sml::_> /
+                       [](State &state) {
+                         DisableCarrier();
+                         StartNextSegment(state);
+                       },
+        QuietTx + sml::event<CarrierTimeout>[IsNotCmdDone] = CarrierTx);
+  }
+};
 
 struct RemoteStateTable {
   auto operator()() const {
@@ -279,15 +317,24 @@ struct RemoteStateTable {
         QuietRx + sml::event<CmdTimeout> / SaveCmd = CmdOk,
         QuietRx + sml::event<IrEdge>[IsCmdFull] / FailProgramming = QuietRx,
         CmdOk + sml::event<ButtonDown<Sym::kOk>> / SaveCmd = ProgIdle,
-        CmdOk + sml::event<ButtonDown<Sym::kEsc>> = ProgIdle
+        CmdOk + sml::event<ButtonDown<Sym::kEsc>> = ProgIdle,
         // Tx
-
-    );
+        Idle + sml::event<ButtonDown<Sym::k0>> / LoadProg = LoadingProg,
+        LoadingProg + sml::event<LoadDone> = ChoosingFirstCmd,
+        ChoosingFirstCmd[IsProgDone] = Idle,
+        ChoosingFirstCmd[IsNotProgDone] = sml::state<Tx>,
+        sml::state<Tx> + sml::event<ButtonDown<Sym::kEsc>> = Idle,
+        sml::state<Tx> + sml::event<CarrierTimeout>[IsCmdDone] =
+            ChoosingNextCmd,
+        ChoosingNextCmd + sml::on_entry<sml::_> / GetNextNonEmptyCmd,
+        ChoosingNextCmd[IsNotProgDone] / StartInterCmd = WaitingForNextCmd,
+        ChoosingNextCmd[IsProgDone] = Idle,
+        WaitingForNextCmd + sml::event<CarrierTimeout> = sml::state<Tx>);
   }
 };
 
 using RemoteState = sml::sm<RemoteStateTable>;
-RemoteState g_remote_state{g_rx_state};
+RemoteState g_remote_state{g_state};
 
 /**
  * Start debounce timer and wait for it, discarding interrupts for a button.
