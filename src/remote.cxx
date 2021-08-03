@@ -72,7 +72,7 @@ struct State {
   Cmd cmd{};
   Program prog{};
 };
-State g_state{};
+State g_remote_state{};
 /*******************************************************************************
 
 Setup
@@ -172,7 +172,8 @@ void command_timer_setup() {
   timer_one_shot_mode(timer.tim_);
   timer_disable_preload(timer.tim_);
   timer_enable_update_event(timer.tim_);
-  timer_update_on_overflow(timer.tim_);
+  //timer_update_on_overflow(timer.tim_);
+  timer_update_on_any(timer.tim_);
   timer_set_prescaler(timer.tim_, timer.prescaler_);
   timer_set_period(timer.tim_, timer.period_);
   // force update of prescaler register
@@ -180,6 +181,8 @@ void command_timer_setup() {
 
   nvic_enable_irq(util::GetTimerIrqn(timer.tim_).first);
   timer_enable_irq(timer.tim_, TIM_DIER_UIE);
+
+  timer_enable_counter(timer.tim_);
 }
 
 /**
@@ -297,8 +300,11 @@ auto LoadProg = [](State &state) { state.cmd_i = 0; };
 auto SetupTx = [](State &state) {
   // TODO: set prescaler
   state.seq_i = 0;
+  timer_disable_counter(kCommandTimer.tim_);
   timer_continuous_mode(kCommandTimer.tim_);
   timer_set_counter(kCommandTimer.tim_, 0);
+  timer_set_period(kCommandTimer.tim_, kCommandTimer.period_);
+  timer_generate_event(kCommandTimer.tim_, TIM_EGR_UG);
   timer_enable_counter(kCommandTimer.tim_);
 };
 
@@ -364,9 +370,10 @@ struct RemoteStateTable {
         Idle + sml::event<ButtonDown<Sym::k0>> / LoadProg = ChoosingFirstCmd,
         ChoosingFirstCmd + sml::on_entry<sml::_> / GetNextNonEmptyCmd,
         ChoosingFirstCmd[IsProgDone] = Idle,
+        ChoosingFirstCmd + sml::on_exit<sml::_> / []() { int x = 1 + 1; },
         ChoosingFirstCmd[IsNotProgDone] = sml::state<Tx>,
         sml::state<Tx> + sml::on_entry<sml::_> / SetupTx,
-        sml::state<Tx> + sml::on_entry<sml::_> / CleanTx,
+        sml::state<Tx> + sml::on_exit<sml::_> / CleanTx,
         sml::state<Tx> + sml::event<ButtonDown<Sym::kEsc>> = Idle,
         sml::state<Tx> + sml::event<CmdTimeout>[IsCmdDone] /
                              [](State &state) { state.cmd_i++; } =
@@ -378,8 +385,8 @@ struct RemoteStateTable {
   }
 };
 
-using RemoteState = sml::sm<RemoteStateTable>;
-RemoteState g_remote_state{g_state};
+using RemoteStateMachine = sml::sm<RemoteStateTable>;
+RemoteStateMachine g_remote_state_machine{g_remote_state};
 
 /**
  * Start debounce timer and wait for it, discarding interrupts for a button.
@@ -413,16 +420,16 @@ template <typename ButtonT> void debounce_delay_block(ButtonT &button) {
  * flag.
  */
 template <typename ButtonT>
-void ProcessButton(ButtonT &button, RemoteState &remote_state) {
+void ProcessButton(ButtonT &button, RemoteStateMachine &remote_state_machine) {
   // Handle the case that the button is in a stable state
   switch (button.state) {
   case ButtonState::kUp:
-    remote_state.process_event(ButtonDown<ButtonT::GetSym()>{});
+    remote_state_machine.process_event(ButtonDown<ButtonT::GetSym()>{});
     button.state = ButtonState::kBouncingDown;
     break;
   case ButtonState::kDown:
     // Button released event
-    remote_state.process_event(ButtonUp<ButtonT::GetSym()>{});
+    remote_state_machine.process_event(ButtonUp<ButtonT::GetSym()>{});
     button.state = ButtonState::kBouncingUp;
     break;
   case ButtonState::kBouncingDown:
@@ -438,7 +445,7 @@ void ProcessButton(ButtonT &button, RemoteState &remote_state) {
       if (IsButtonDown(gpio_get(button.io.port, button.io.pin))) {
         button.state = ButtonState::kDown;
       } else {
-        remote_state.process_event(ButtonUp<ButtonT::GetSym()>{});
+        remote_state_machine.process_event(ButtonUp<ButtonT::GetSym()>{});
         button.state = ButtonState::kBouncingUp;
       }
       break;
@@ -447,7 +454,7 @@ void ProcessButton(ButtonT &button, RemoteState &remote_state) {
       if (IsButtonUp(gpio_get(button.io.port, button.io.pin))) {
         button.state = ButtonState::kUp;
       } else {
-        remote_state.process_event(ButtonDown<ButtonT::GetSym()>{});
+        remote_state_machine.process_event(ButtonDown<ButtonT::GetSym()>{});
         button.state = ButtonState::kBouncingDown;
       }
       break;
@@ -490,22 +497,28 @@ void usage_fault_handler(void) {
 
 void exti0_isr(void) {
   exti_reset_request(EXTI0);
-  g_remote_state.process_event(IrEdge{});
+  g_remote_state_machine.process_event(IrEdge{});
 }
 
-void exti1_isr(void) { ProcessButton(std::get<0>(g_buttons), g_remote_state); }
+void exti1_isr(void) {
+  ProcessButton(std::get<0>(g_buttons), g_remote_state_machine);
+}
 
 void exti2_isr(void) { /* USART2 */
 }
 
-void exti3_isr(void) { ProcessButton(std::get<1>(g_buttons), g_remote_state); }
+void exti3_isr(void) {
+  ProcessButton(std::get<1>(g_buttons), g_remote_state_machine);
+}
 
-void exti4_isr(void) { ProcessButton(std::get<2>(g_buttons), g_remote_state); }
+void exti4_isr(void) {
+  ProcessButton(std::get<2>(g_buttons), g_remote_state_machine);
+}
 
 void exti9_5_isr(void) {
   auto ProcessIfPending = [](auto button) {
     if (exti_get_flag_status(util::GetExti(button.io.pin).value())) {
-      ProcessButton(button, g_remote_state);
+      ProcessButton(button, g_remote_state_machine);
     }
   };
 
@@ -517,7 +530,7 @@ void exti9_5_isr(void) {
 void exti10_15_isr(void) { /* unused */
 }
 
-void tim2_isr(void) { g_remote_state.process_event(CmdTimeout{}); }
+void tim2_isr(void) { g_remote_state_machine.process_event(CmdTimeout{}); }
 
 } // extern "C"
 
@@ -538,6 +551,12 @@ int main(void) {
   command_timer_setup();
   debounce_setup();
   ir_timers_setup();
+
+  // TODO: REMOVE
+  Cmd my_cmd{};
+  my_cmd.Append(2000);
+  g_remote_state.prog.Append(my_cmd);
+
   while (1) {
     /* wait a little bit */
     for (int i = 0; i < 400000; i++) {
