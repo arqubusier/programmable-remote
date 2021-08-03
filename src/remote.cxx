@@ -49,6 +49,7 @@ util::Timer output_inter_segment_timer{
     TIM4, TIM_OC1, input_inter_segment_prescaler,
     util::ns2count(input_inter_segment_timer_freq, 24 * MEGA)};
 util::Timer const kCommandTimer{TIM2, TIM_OC1, 22 - 1, 0xFFFF};
+util::Timer const kInterCmdTimer{kCommandTimer.tim_, TIM_OC1, 121 - 1, 0xFFFF};
 util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
 u32 const kUsartBaud{2400};
@@ -169,12 +170,12 @@ void command_timer_setup() {
   timer_set_mode(timer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                  TIM_CR1_DIR_UP);
   timer_one_shot_mode(timer.tim_);
-  timer_enable_preload(timer.tim_);
+  timer_disable_preload(timer.tim_);
   timer_enable_update_event(timer.tim_);
   timer_update_on_overflow(timer.tim_);
   timer_set_prescaler(timer.tim_, timer.prescaler_);
   timer_set_period(timer.tim_, timer.period_);
-  // force update of auto-reload register
+  // force update of prescaler register
   timer_generate_event(timer.tim_, TIM_EGR_UG);
 
   nvic_enable_irq(util::GetTimerIrqn(timer.tim_).first);
@@ -225,18 +226,16 @@ template <Sym sym> struct ButtonUp {
 /* Events */
 struct NoEvent {};
 struct IrEdge {};
-struct CarrierTimeout {};
 struct CmdTimeout {};
 struct LoadDone {};
 
 /* States */
 auto Idle = sml::state<class Idle>;
-auto SelectingProg = sml::state<class SelectProg>;
+auto SelectingProg = sml::state<class SelectingProg>;
 auto ProgIdle = sml::state<class ProgIdle>;
 auto CarrierRx = sml::state<class CarrierRx>;
 auto QuietRx = sml::state<class QuietRx>;
 auto CmdOk = sml::state<class CmdOk>;
-auto LoadingProg = sml::state<class LoadingProg>;
 auto ChoosingFirstCmd = sml::state<class ChoosingFirstCmd>;
 auto CarrierTx = sml::state<class CarrierTx>;
 auto QuietTx = sml::state<class QuietTx>;
@@ -250,7 +249,7 @@ auto EnterProgramming = [] {};
 auto FailProgramming = [] {};
 auto SaveProg = [](State &state) {};
 
-auto ResetSegTimer = [] {
+auto ResetRxTimer = [] {
   timer_set_counter(kCommandTimer.tim_, 0);
   timer_enable_counter(kCommandTimer.tim_);
 };
@@ -269,16 +268,58 @@ auto SaveSeg = [](State &state) {
 };
 
 auto SaveCmd = [](State &state) { state.prog.Append(state.cmd); };
-auto EnableCarrier = []() {};
-auto DisableCarrier = []() {};
-auto StartNextSegment = [](State &state) {};
-auto GetNextNonEmptyCmd = [](State &state) {};
-auto StartInterCmd = [](State &state) {};
-auto LoadProg = [](State &state) {};
-auto IsNotCmdDone = [](State &state) -> bool { return true; };
-auto IsCmdDone = [](State &state) -> bool { return true; };
-auto IsProgDone = [](State &state) -> bool { return true; };
-auto IsNotProgDone = [](State &state) -> bool { return true; };
+// TODO: use actual carrier timer
+auto EnableCarrier = []() { gpio_set(led_status.port, led_status.pin); };
+// TODO: use actual carrier timer
+auto DisableCarrier = []() { gpio_clear(led_status.port, led_status.pin); };
+auto StartNextSegment = [](State &state) {
+  auto seq = state.prog.Get(state.cmd_i).Get(state.seq_i);
+  timer_set_period(kCommandTimer.tim_, seq);
+  state.seq_i++;
+};
+// start searching at cmd_i, in the end cmd_i points to the next cmd to use or
+// outside of prog.
+auto GetNextNonEmptyCmd = [](State &state) {
+  auto &cmd_i = state.cmd_i;
+  auto &prog = state.prog;
+  while ((cmd_i < prog.Size()) && (prog.Get(cmd_i).Size() == 0)) {
+    cmd_i++;
+  }
+};
+auto StartInterCmd = [](State &state) {
+  // TODO: set prescaler (update event, prevent interrupt etc.)
+  timer_one_shot_mode(kCommandTimer.tim_);
+  timer_set_counter(kInterCmdTimer.tim_, 0);
+  timer_set_period(kInterCmdTimer.tim_, kInterCmdTimer.period_);
+  timer_enable_counter(kCommandTimer.tim_);
+};
+auto LoadProg = [](State &state) { state.cmd_i = 0; };
+auto SetupTx = [](State &state) {
+  // TODO: set prescaler
+  state.seq_i = 0;
+  timer_continuous_mode(kCommandTimer.tim_);
+  timer_set_counter(kCommandTimer.tim_, 0);
+  timer_enable_counter(kCommandTimer.tim_);
+};
+
+auto CleanTx = [](State &state) {
+  // TODO: use actual carrier timer
+  gpio_clear(led_status.port, led_status.pin);
+  timer_disable_counter(kCommandTimer.tim_);
+};
+
+auto SetupRx = []() {
+  timer_one_shot_mode(kCommandTimer.tim_);
+  timer_set_period(kCommandTimer.tim_, kCommandTimer.period_);
+};
+auto IsCmdDone = [](State &state) -> bool {
+  return state.seq_i >= state.prog.Get(state.cmd_i).Size();
+};
+auto IsNotCmdDone = [](State &state) -> bool { return !IsCmdDone(state); };
+auto IsProgDone = [](State &state) -> bool {
+  return state.cmd_i >= state.prog.Size();
+};
+auto IsNotProgDone = [](State &state) -> bool { return !IsProgDone(state); };
 
 /* State machines */
 
@@ -290,13 +331,13 @@ struct Tx {
                            EnableCarrier();
                            StartNextSegment(state);
                          },
-        CarrierTx + sml::event<CarrierTimeout>[IsNotCmdDone] = QuietTx,
+        CarrierTx + sml::event<CmdTimeout>[IsNotCmdDone] = QuietTx,
         *QuietTx + sml::on_entry<sml::_> /
                        [](State &state) {
                          DisableCarrier();
                          StartNextSegment(state);
                        },
-        QuietTx + sml::event<CarrierTimeout>[IsNotCmdDone] = CarrierTx);
+        QuietTx + sml::event<CmdTimeout>[IsNotCmdDone] = CarrierTx);
   }
 };
 
@@ -306,11 +347,12 @@ struct RemoteStateTable {
         // Rx
         *Idle + sml::event<ButtonDown<Sym::kOk>> / EnterProgramming =
             SelectingProg,
+        SelectingProg + sml::on_entry<sml::_> / SetupRx,
         SelectingProg + sml::event<ButtonDown<Sym::k0>> / SelectProg = ProgIdle,
-        ProgIdle + sml::event<IrEdge> / ResetSegTimer = CarrierRx,
+        ProgIdle + sml::event<IrEdge> / ResetRxTimer = CarrierRx,
         ProgIdle + sml::event<ButtonDown<Sym::kOk>> / SaveProg = CarrierRx,
         ProgIdle + sml::event<ButtonDown<Sym::kEsc>> / SaveProg = CarrierRx,
-        CarrierRx + sml::event<CarrierTimeout> / FailProgramming = Idle,
+        CarrierRx + sml::event<CmdTimeout> / FailProgramming = Idle,
         CarrierRx + sml::event<IrEdge> / SaveSeg = QuietRx,
         CarrierRx + sml::event<IrEdge>[IsCmdFull] / FailProgramming = QuietRx,
         QuietRx + sml::event<IrEdge> / SaveSeg = CarrierRx,
@@ -319,17 +361,20 @@ struct RemoteStateTable {
         CmdOk + sml::event<ButtonDown<Sym::kOk>> / SaveCmd = ProgIdle,
         CmdOk + sml::event<ButtonDown<Sym::kEsc>> = ProgIdle,
         // Tx
-        Idle + sml::event<ButtonDown<Sym::k0>> / LoadProg = LoadingProg,
-        LoadingProg + sml::event<LoadDone> = ChoosingFirstCmd,
+        Idle + sml::event<ButtonDown<Sym::k0>> / LoadProg = ChoosingFirstCmd,
+        ChoosingFirstCmd + sml::on_entry<sml::_> / GetNextNonEmptyCmd,
         ChoosingFirstCmd[IsProgDone] = Idle,
         ChoosingFirstCmd[IsNotProgDone] = sml::state<Tx>,
+        sml::state<Tx> + sml::on_entry<sml::_> / SetupTx,
+        sml::state<Tx> + sml::on_entry<sml::_> / CleanTx,
         sml::state<Tx> + sml::event<ButtonDown<Sym::kEsc>> = Idle,
-        sml::state<Tx> + sml::event<CarrierTimeout>[IsCmdDone] =
+        sml::state<Tx> + sml::event<CmdTimeout>[IsCmdDone] /
+                             [](State &state) { state.cmd_i++; } =
             ChoosingNextCmd,
         ChoosingNextCmd + sml::on_entry<sml::_> / GetNextNonEmptyCmd,
         ChoosingNextCmd[IsNotProgDone] / StartInterCmd = WaitingForNextCmd,
         ChoosingNextCmd[IsProgDone] = Idle,
-        WaitingForNextCmd + sml::event<CarrierTimeout> = sml::state<Tx>);
+        WaitingForNextCmd + sml::event<CmdTimeout> = sml::state<Tx>);
   }
 };
 

@@ -122,6 +122,16 @@ prescaler = 5ms * 72 MHz/65535 = 5.4...
 set prescaler to 6 ->
 counter = 5ms * 72 MHz/6 = 60'000
 
+*** Transmit inter command
+
+Reuse Command timer.
+
+set prescaler to 23 -> timeout approx 110 ms
+65535*(121/72Mhz) = 0.11013520833333335 s
+
+If this time is too short, a receiving device might ignore it and/or think it is part and/or think it is part of the previous command.
+
+Test appropriate value.
 
 ** Buttons
 

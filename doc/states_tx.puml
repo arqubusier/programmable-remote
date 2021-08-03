@@ -17,7 +17,7 @@ CarrierTx : onEntry/ Enable carrier,\nStartNextSegment(state)
 QuietTx --> CarrierTx : Timeout(SegT)\n[!IsCommandCompleted(state)]
 QuietTx : onEntry/ Disable carrier,\nStartNextSegment(state)
 }
-Tx --> ChoosingNextCommand : Timeout(SegT) [IsCommandCompleted(state)]
+Tx --> ChoosingNextCommand : Timeout(SegT) [IsCommandCompleted(state)]\n/ cmd_i++
 Tx --> Idle : Down(Esc)
 
 State Functions {
