@@ -167,22 +167,20 @@ void command_timer_setup() {
   rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(timer.tim_).first);
 
   timer_disable_counter(timer.tim_);
+  timer_disable_preload(timer.tim_);
   timer_set_mode(timer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
                  TIM_CR1_DIR_UP);
   timer_one_shot_mode(timer.tim_);
-  timer_disable_preload(timer.tim_);
   timer_enable_update_event(timer.tim_);
-  //timer_update_on_overflow(timer.tim_);
-  timer_update_on_any(timer.tim_);
+  timer_update_on_overflow(timer.tim_);
   timer_set_prescaler(timer.tim_, timer.prescaler_);
   timer_set_period(timer.tim_, timer.period_);
+  timer_set_counter(kCommandTimer.tim_, 0);
   // force update of prescaler register
   timer_generate_event(timer.tim_, TIM_EGR_UG);
 
   nvic_enable_irq(util::GetTimerIrqn(timer.tim_).first);
   timer_enable_irq(timer.tim_, TIM_DIER_UIE);
-
-  timer_enable_counter(timer.tim_);
 }
 
 /**
@@ -530,7 +528,10 @@ void exti9_5_isr(void) {
 void exti10_15_isr(void) { /* unused */
 }
 
-void tim2_isr(void) { g_remote_state_machine.process_event(CmdTimeout{}); }
+void tim2_isr(void) {
+  timer_clear_flag(kCommandTimer.tim_, TIM_SR_UIF);
+  g_remote_state_machine.process_event(CmdTimeout{});
+}
 
 } // extern "C"
 
