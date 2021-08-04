@@ -49,6 +49,8 @@ util::Timer output_inter_segment_timer{
     TIM4, TIM_OC1, input_inter_segment_prescaler,
     util::ns2count(input_inter_segment_timer_freq, 24 * MEGA)};
 util::Timer const kCommandTimer{TIM2, TIM_OC1, 22 - 1, 0xFFFF};
+u16 InterCmdTimertCnt{0xFFFF};
+u16 RxNextCmdTimeout{49090};
 util::Timer const kInterCmdTimer{kCommandTimer.tim_, TIM_OC1, 121 - 1, 0xFFFF};
 util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
 
@@ -175,7 +177,7 @@ void command_timer_setup() {
   timer_update_on_overflow(timer.tim_);
   timer_set_prescaler(timer.tim_, timer.prescaler_);
   timer_set_period(timer.tim_, timer.period_);
-  timer_set_counter(kCommandTimer.tim_, 0);
+  timer_set_counter(timer.tim_, 0);
   // force update of prescaler register
   timer_generate_event(timer.tim_, TIM_EGR_UG);
 
@@ -300,9 +302,8 @@ auto SetupTx = [](State &state) {
   state.seq_i = 0;
   timer_disable_counter(kCommandTimer.tim_);
   timer_continuous_mode(kCommandTimer.tim_);
-  timer_set_counter(kCommandTimer.tim_, 0);
   timer_set_period(kCommandTimer.tim_, kCommandTimer.period_);
-  timer_generate_event(kCommandTimer.tim_, TIM_EGR_UG);
+  timer_set_counter(kCommandTimer.tim_, 0);
   timer_enable_counter(kCommandTimer.tim_);
 };
 
@@ -336,11 +337,11 @@ struct Tx {
                            StartNextSegment(state);
                          },
         CarrierTx + sml::event<CmdTimeout>[IsNotCmdDone] = QuietTx,
-        *QuietTx + sml::on_entry<sml::_> /
-                       [](State &state) {
-                         DisableCarrier();
-                         StartNextSegment(state);
-                       },
+        QuietTx + sml::on_entry<sml::_> /
+                      [](State &state) {
+                        DisableCarrier();
+                        StartNextSegment(state);
+                      },
         QuietTx + sml::event<CmdTimeout>[IsNotCmdDone] = CarrierTx);
   }
 };
@@ -395,7 +396,6 @@ RemoteStateMachine g_remote_state_machine{g_remote_state};
 template <typename ButtonT> void debounce_delay_block(ButtonT &button) {
   u32 exti{util::GetExti(button.io.pin).value()};
   exti_disable_request(exti);
-  // TODO: clear nvic pending
   exti_reset_request(exti);
 
   timer_set_counter(kDebounceTimer.tim_, 0);
@@ -528,10 +528,14 @@ void exti9_5_isr(void) {
 void exti10_15_isr(void) { /* unused */
 }
 
+void tim1_isr(void) { timer_clear_flag(TIM1, TIM_SR_UIF); }
+
 void tim2_isr(void) {
-  timer_clear_flag(kCommandTimer.tim_, TIM_SR_UIF);
+  timer_clear_flag(TIM2, TIM_SR_UIF);
   g_remote_state_machine.process_event(CmdTimeout{});
 }
+
+void tim3_isr(void) { timer_clear_flag(TIM3, TIM_SR_UIF); }
 
 } // extern "C"
 
@@ -554,9 +558,29 @@ int main(void) {
   ir_timers_setup();
 
   // TODO: REMOVE
-  Cmd my_cmd{};
-  my_cmd.Append(2000);
-  g_remote_state.prog.Append(my_cmd);
+  Cmd cmd0{};
+  cmd0.Append(29455);
+  cmd0.Append(14727);
+  cmd0.Append(1833);
+  cmd0.Append(1833);
+  cmd0.Append(2000);
+  cmd0.Append(3000);
+  cmd0.Append(4000);
+  cmd0.Append(5000);
+  cmd0.Append(6000);
+  cmd0.Append(7000);
+  cmd0.Append(8000);
+  cmd0.Append(9000);
+  cmd0.Append(10000);
+  Cmd cmd1{};
+  cmd1.Append(29455);
+  cmd1.Append(14727);
+  cmd1.Append(1833);
+  cmd1.Append(1833);
+  cmd1.Append(2000);
+  cmd1.Append(3000);
+  g_remote_state.prog.Append(cmd0);
+  g_remote_state.prog.Append(cmd1);
 
   while (1) {
     /* wait a little bit */
