@@ -53,6 +53,7 @@ u16 InterCmdTimertCnt{0xFFFF};
 u16 RxNextCmdTimeout{49090};
 util::Timer const kInterCmdTimer{kCommandTimer.tim_, TIM_OC1, 121 - 1, 0xFFFF};
 util::Timer const kDebounceTimer{TIM3, TIM_OC1, 6 - 1, 60000};
+util::Timer const kCarrierTimer{TIM4, TIM_OC1, 1 - 1, 947};
 
 u32 const kUsartBaud{2400};
 
@@ -159,9 +160,40 @@ void buttons_setup() {
 }
 
 /**
+ * Configure the timer used for creating carrier pulses.
+ */
+void carrier_timer_setup() {
+  util::Timer const &timer = kCarrierTimer;
+
+  rcc_periph_clock_enable(util::GetTimerRccPeriphClken(timer.tim_).first);
+  // Reset timer peripheral to defaults.
+  rcc_periph_reset_pulse(util::GetTimerRccPeriphRst(timer.tim_).first);
+
+  timer_disable_counter(timer.tim_);
+  timer_disable_preload(timer.tim_);
+  timer_set_mode(timer.tim_, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE,
+                 TIM_CR1_DIR_UP);
+  timer_continuous_mode(timer.tim_);
+  timer_enable_update_event(timer.tim_);
+  timer_update_on_overflow(timer.tim_);
+  timer_set_prescaler(timer.tim_, timer.prescaler_);
+  timer_set_period(timer.tim_, timer.period_);
+  timer_set_counter(timer.tim_, 0);
+  // force update of prescaler register
+  timer_generate_event(timer.tim_, TIM_EGR_UG);
+
+  // Output compare configuration
+  timer_disable_oc_preload(timer.tim_, timer.channel_);
+  timer_set_oc_value(timer.tim_, timer.channel_, timer.period_);
+  timer_set_oc_mode(timer.tim_, timer.channel_, TIM_OCM_TOGGLE);
+  timer_set_oc_polarity_high(timer.tim_, timer.channel_);
+  timer_enable_oc_output(timer.tim_, timer.channel_);
+}
+
+/**
  * Configure the command timer.
  */
-void command_timer_setup() {
+void cmd_timer_setup() {
   util::Timer const &timer = kCommandTimer;
 
   rcc_periph_clock_enable(util::GetTimerRccPeriphClken(timer.tim_).first);
@@ -271,10 +303,14 @@ auto SaveSeg = [](State &state) {
 };
 
 auto SaveCmd = [](State &state) { state.prog.Append(state.cmd); };
-// TODO: use actual carrier timer
-auto EnableCarrier = []() { gpio_set(led_status.port, led_status.pin); };
-// TODO: use actual carrier timer
-auto DisableCarrier = []() { gpio_clear(led_status.port, led_status.pin); };
+auto EnableCarrier = []() {
+  gpio_set(led_status.port, led_status.pin);
+  timer_enable_oc_output(kCarrierTimer.tim_, kCarrierTimer.channel_);
+};
+auto DisableCarrier = []() {
+  gpio_clear(led_status.port, led_status.pin);
+  timer_disable_oc_output(kCarrierTimer.tim_, kCarrierTimer.channel_);
+};
 auto StartNextSegment = [](State &state) {
   auto seq = state.prog.Get(state.cmd_i).Get(state.seq_i);
   timer_set_period(kCommandTimer.tim_, seq);
@@ -304,18 +340,25 @@ auto SetupTx = [](State &state) {
   timer_continuous_mode(kCommandTimer.tim_);
   timer_set_period(kCommandTimer.tim_, kCommandTimer.period_);
   timer_set_counter(kCommandTimer.tim_, 0);
+
+  timer_set_counter(kCarrierTimer.tim_, 0);
+  timer_enable_oc_output(kCarrierTimer.tim_, kCarrierTimer.channel_);
+
   timer_enable_counter(kCommandTimer.tim_);
+  timer_enable_counter(kCarrierTimer.tim_);
 };
 
 auto CleanTx = [](State &state) {
   // TODO: use actual carrier timer
   gpio_clear(led_status.port, led_status.pin);
+  timer_disable_oc_output(kCarrierTimer.tim_, kCarrierTimer.channel_);
   timer_disable_counter(kCommandTimer.tim_);
+  timer_disable_counter(kCarrierTimer.tim_);
 };
 
 auto SetupRx = []() {
   timer_one_shot_mode(kCommandTimer.tim_);
-  timer_set_period(kCommandTimer.tim_, kCommandTimer.period_);
+  timer_set_period(kCommandTimer.tim_, RxNextCmdTimeout);
 };
 auto IsCmdDone = [](State &state) -> bool {
   return state.seq_i >= state.prog.Get(state.cmd_i).Size();
@@ -553,7 +596,8 @@ int main(void) {
   usart_setup();
   gpio_setup();
   buttons_setup();
-  command_timer_setup();
+  cmd_timer_setup();
+  carrier_timer_setup();
   debounce_setup();
   ir_timers_setup();
 
