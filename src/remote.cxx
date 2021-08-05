@@ -65,7 +65,7 @@ auto g_buttons = std::make_tuple(
 util::Io ir_input{GPIOA, GPIO0};
 util::Io ir_output{GPIOB, GPIO6};
 util::Io led_status{GPIOC, GPIO13};
-util::Io led_fail{GPIOC, GPIO14};
+util::Io led_fail{GPIOC, GPIO15};
 util::Io usart_io{GPIOA, GPIO2};
 
 struct State {
@@ -284,7 +284,8 @@ auto EnterProgramming = [] {};
 auto FailProgramming = [] {};
 auto SaveProg = [](State &state) {};
 
-auto ResetRxTimer = [] {
+auto StartProg = [](State &state) {
+  state.prog.Reset();
   timer_set_counter(kCommandTimer.tim_, 0);
   timer_enable_counter(kCommandTimer.tim_);
 };
@@ -368,6 +369,17 @@ auto IsProgDone = [](State &state) -> bool {
   return state.cmd_i >= state.prog.Size();
 };
 auto IsNotProgDone = [](State &state) -> bool { return !IsProgDone(state); };
+auto EnterIdle = []() { gpio_clear(led_status.port, led_status.pin); };
+auto EnterProgIdle = []() { gpio_set(led_status.port, led_status.pin); };
+auto ExitProgIdle = []() { gpio_clear(led_status.port, led_status.pin); };
+auto EnterCmdOk = []() {
+  gpio_set(led_status.port, led_status.pin);
+  gpio_set(led_fail.port, led_fail.pin);
+};
+auto ExitCmdOk = []() {
+  gpio_clear(led_status.port, led_status.pin);
+  gpio_clear(led_fail.port, led_fail.pin);
+};
 
 /* State machines */
 
@@ -395,19 +407,24 @@ struct RemoteStateTable {
         // Rx
         *Idle + sml::event<ButtonDown<Sym::kOk>> / EnterProgramming =
             SelectingProg,
+        Idle + sml::on_entry<sml::_> / EnterIdle,
         SelectingProg + sml::on_entry<sml::_> / SetupRx,
         SelectingProg + sml::event<ButtonDown<Sym::k0>> / SelectProg = ProgIdle,
-        ProgIdle + sml::event<IrEdge> / ResetRxTimer = CarrierRx,
-        ProgIdle + sml::event<ButtonDown<Sym::kOk>> / SaveProg = CarrierRx,
-        ProgIdle + sml::event<ButtonDown<Sym::kEsc>> / SaveProg = CarrierRx,
+        ProgIdle + sml::event<IrEdge> / StartProg = CarrierRx,
+        ProgIdle + sml::event<ButtonDown<Sym::kOk>> / SaveProg = Idle,
+        ProgIdle + sml::event<ButtonDown<Sym::kEsc>> = Idle,
+        ProgIdle + sml::on_entry<sml::_> / EnterProgIdle,
+        ProgIdle + sml::on_exit<sml::_> / ExitProgIdle,
         CarrierRx + sml::event<CmdTimeout> / FailProgramming = Idle,
         CarrierRx + sml::event<IrEdge> / SaveSeg = QuietRx,
         CarrierRx + sml::event<IrEdge>[IsCmdFull] / FailProgramming = QuietRx,
         QuietRx + sml::event<IrEdge> / SaveSeg = CarrierRx,
-        QuietRx + sml::event<CmdTimeout> / SaveCmd = CmdOk,
+        QuietRx + sml::event<CmdTimeout> = CmdOk,
         QuietRx + sml::event<IrEdge>[IsCmdFull] / FailProgramming = QuietRx,
         CmdOk + sml::event<ButtonDown<Sym::kOk>> / SaveCmd = ProgIdle,
         CmdOk + sml::event<ButtonDown<Sym::kEsc>> = ProgIdle,
+        CmdOk + sml::on_entry<sml::_> / EnterCmdOk,
+        CmdOk + sml::on_exit<sml::_> / ExitCmdOk,
         // Tx
         Idle + sml::event<ButtonDown<Sym::k0>> / LoadProg = ChoosingFirstCmd,
         ChoosingFirstCmd + sml::on_entry<sml::_> / GetNextNonEmptyCmd,
