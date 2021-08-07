@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name programmable-remote)(type Legacy)(uri ${KIPRJMOD}/programmable-remote.lib)(options "")(descr ""))
+)
