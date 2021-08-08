@@ -46,17 +46,6 @@ F 3 "~" H 1350 1500 50  0001 C CNN
 	1    1350 1500
 	1    0    0    -1  
 $EndComp
-$Comp
-L Interface_Optical:TSOP43xx U3
-U 1 1 60BD0275
-P 4900 6750
-F 0 "U3" H 4434 6708 50  0000 R CNN
-F 1 "TSOP43xx" H 4434 6799 50  0000 R CNN
-F 2 "OptoDevice:Vishay_MOLD-3Pin" H 4850 6375 50  0001 C CNN
-F 3 "http://www.vishay.com/docs/82460/tsop45.pdf" H 5550 7050 50  0001 C CNN
-	1    4900 6750
-	1    0    0    -1  
-$EndComp
 Wire Wire Line
 	8850 6000 8550 6000
 Wire Wire Line
@@ -405,16 +394,14 @@ IR_IN
 Wire Wire Line
 	2850 5700 2500 5700
 Wire Wire Line
-	5300 6950 5750 6950
+	5750 6750 5750 6900
+Connection ~ 5750 6900
 Wire Wire Line
-	5750 6750 5750 6950
-Connection ~ 5750 6950
+	5750 6900 6400 6900
 Wire Wire Line
-	5750 6950 6400 6950
+	5300 6600 5450 6600
 Wire Wire Line
-	5300 6550 5450 6550
-Wire Wire Line
-	5450 6550 5450 6450
+	5450 6600 5450 6450
 Wire Wire Line
 	5450 6450 5750 6450
 Connection ~ 5750 6450
@@ -424,10 +411,6 @@ Wire Wire Line
 	6300 6450 6400 6450
 Wire Wire Line
 	6400 6800 5450 6800
-Wire Wire Line
-	5450 6800 5450 6750
-Wire Wire Line
-	5450 6750 5300 6750
 Text Label 6700 2000 0    50   ~ 0
 KOK
 Text Label 6700 1800 0    50   ~ 0
@@ -480,8 +463,6 @@ Text Label 2400 7050 0    50   ~ 0
 OSC_OUT
 Wire Wire Line
 	2400 6450 2200 6450
-Text Label 1250 7050 2    50   ~ 0
-V0
 Wire Wire Line
 	1800 7050 2200 7050
 Wire Wire Line
@@ -617,8 +598,6 @@ VDD4
 Wire Wire Line
 	9400 1200 9950 1200
 Wire Wire Line
-	8300 1200 8300 1050
-Wire Wire Line
 	8850 1650 8850 1550
 Wire Wire Line
 	8850 1050 8850 1200
@@ -633,17 +612,6 @@ Wire Wire Line
 	10400 1650 10400 1550
 Wire Wire Line
 	10400 1200 10400 1050
-Wire Wire Line
-	10400 1050 9400 1050
-Wire Wire Line
-	8300 1050 8300 900 
-Connection ~ 8300 1050
-Connection ~ 8850 1050
-Wire Wire Line
-	8850 1050 8300 1050
-Connection ~ 9400 1050
-Wire Wire Line
-	9400 1050 8850 1050
 Wire Wire Line
 	8300 1500 8300 1550
 Wire Wire Line
@@ -768,7 +736,7 @@ Text Notes 8100 3500 0    50   ~ 10
 Switches
 Text Notes 1150 6200 0    50   ~ 10
 Crystal
-Text Notes 4050 6200 0    50   ~ 10
+Text Notes 4250 6200 0    50   ~ 10
 Ir sensing
 Text Notes 750  7700 0    50   ~ 0
 C_stray, the capacitance of the pcb trace and mcu is assumed to be 5 pF.\nC_l is the expected load capacitance of the\ncrystal. C is the capacitance from the capacitor at each leg.\nUse the following formula to determine C:\nC = 2*C_l - 2*C_stray = 2*18 - 10 [pF] =26 pF.
@@ -1064,7 +1032,7 @@ Text GLabel 10150 4350 2    50   Input ~ 0
 GND
 Text GLabel 10750 4800 2    50   Input ~ 0
 VDD
-Text GLabel 6400 6950 2    50   Input ~ 0
+Text GLabel 6400 6900 2    50   Input ~ 0
 GND
 Text GLabel 10750 5800 2    50   Input ~ 0
 GND
@@ -1081,5 +1049,32 @@ GND
 Text GLabel 1000 2100 3    50   Input ~ 0
 GND
 Text GLabel 5500 1250 0    50   Input ~ 0
+VDD
+Wire Wire Line
+	5450 6800 5450 6750
+Wire Wire Line
+	5450 6750 5300 6750
+$Comp
+L programmable-remote:TSOP953xx U3
+U 1 1 616AA23F
+P 5050 6850
+F 0 "U3" H 5103 7325 50  0000 C CNN
+F 1 "TSOP953xx" H 5103 7234 50  0000 C CNN
+F 2 "programmable-remote:TSOP953xx" H 5110 6850 50  0001 C CNN
+F 3 "" H 5110 6850 50  0001 C CNN
+	1    5050 6850
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	5300 6900 5750 6900
+Text GLabel 1250 7050 0    50   Input ~ 0
+GND
+Wire Wire Line
+	8300 900  8300 1200
+Text GLabel 8850 1050 1    50   Input ~ 0
+VDD
+Text GLabel 9400 1050 1    50   Input ~ 0
+VDD
+Text GLabel 10400 1050 1    50   Input ~ 0
 VDD
 $EndSCHEMATC
