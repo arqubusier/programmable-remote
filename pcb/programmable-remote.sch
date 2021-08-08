@@ -49,12 +49,12 @@ $EndComp
 $Comp
 L Interface_Optical:TSOP43xx U3
 U 1 1 60BD0275
-P 4150 6750
-F 0 "U3" H 3684 6708 50  0000 R CNN
-F 1 "TSOP43xx" H 3684 6799 50  0000 R CNN
-F 2 "OptoDevice:Vishay_MOLD-3Pin" H 4100 6375 50  0001 C CNN
-F 3 "http://www.vishay.com/docs/82460/tsop45.pdf" H 4800 7050 50  0001 C CNN
-	1    4150 6750
+P 4900 6750
+F 0 "U3" H 4434 6708 50  0000 R CNN
+F 1 "TSOP43xx" H 4434 6799 50  0000 R CNN
+F 2 "OptoDevice:Vishay_MOLD-3Pin" H 4850 6375 50  0001 C CNN
+F 3 "http://www.vishay.com/docs/82460/tsop45.pdf" H 5550 7050 50  0001 C CNN
+	1    4900 6750
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
@@ -130,35 +130,35 @@ USART_TX
 $Comp
 L Device:C C10
 U 1 1 60BE8135
-P 5000 6600
-F 0 "C10" H 5150 6600 50  0000 L CNN
-F 1 ".1u" H 5150 6500 50  0000 L CNN
-F 2 "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder" H 5038 6450 50  0001 C CNN
-F 3 "~" H 5000 6600 50  0001 C CNN
-	1    5000 6600
+P 5750 6600
+F 0 "C10" H 5900 6600 50  0000 L CNN
+F 1 ".1u" H 5900 6500 50  0000 L CNN
+F 2 "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder" H 5788 6450 50  0001 C CNN
+F 3 "~" H 5750 6600 50  0001 C CNN
+	1    5750 6600
 	1    0    0    -1  
 $EndComp
 $Comp
 L Device:R R6
 U 1 1 60C0358E
-P 5400 6450
-F 0 "R6" V 5300 6450 50  0000 C CNN
-F 1 "100" V 5500 6450 50  0000 C CNN
-F 2 "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder" V 5330 6450 50  0001 C CNN
-F 3 "~" H 5400 6450 50  0001 C CNN
-	1    5400 6450
+P 6150 6450
+F 0 "R6" V 6050 6450 50  0000 C CNN
+F 1 "100" V 6250 6450 50  0000 C CNN
+F 2 "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder" V 6080 6450 50  0001 C CNN
+F 3 "~" H 6150 6450 50  0001 C CNN
+	1    6150 6450
 	0    1    1    0   
 $EndComp
 $Comp
 L programmable-remote:M95640_RMN6TP U2
 U 1 1 610CB268
-P 1900 4850
-F 0 "U2" H 2050 5300 50  0000 C CNN
-F 1 "M95640_RMN6TP" H 2450 4750 50  0000 C CNN
-F 2 "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" H 1900 4850 50  0001 C CNN
-F 3 "" H 1900 4850 50  0001 C CNN
-	1    1900 4850
-	-1   0    0    1   
+P 1950 5100
+F 0 "U2" H 2100 5550 50  0000 C CNN
+F 1 "M95640_RMN6TP" H 2500 5000 50  0000 C CNN
+F 2 "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" H 1950 5100 50  0001 C CNN
+F 3 "" H 1950 5100 50  0001 C CNN
+	1    1950 5100
+	1    0    0    -1  
 $EndComp
 $Comp
 L Device:Battery BT1
@@ -174,12 +174,12 @@ $EndComp
 $Comp
 L Device:R R5
 U 1 1 610D8C9C
-P 2650 4750
-F 0 "R5" H 2720 4796 50  0000 L CNN
-F 1 "4.7k" H 2720 4705 50  0000 L CNN
-F 2 "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder" V 2580 4750 50  0001 C CNN
-F 3 "~" H 2650 4750 50  0001 C CNN
-	1    2650 4750
+P 1250 4600
+F 0 "R5" H 1320 4646 50  0000 L CNN
+F 1 "4.7k" H 1320 4555 50  0000 L CNN
+F 2 "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder" V 1180 4600 50  0001 C CNN
+F 3 "~" H 1250 4600 50  0001 C CNN
+	1    1250 4600
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -259,62 +259,24 @@ F 3 "~" H 8950 2350 50  0001 C CNN
 	1    8950 2350
 	0    -1   1    0   
 $EndComp
-Wire Wire Line
-	2650 4900 2200 4900
-Text Label 2850 4900 0    50   ~ 0
+Text Label 1100 5050 2    50   ~ 0
 CS
-Text Label 2850 5000 0    50   ~ 0
+Text Label 1100 4950 2    50   ~ 0
 SCK
-Text Label 2850 5100 0    50   ~ 0
+Text Label 1100 4850 2    50   ~ 0
 MOSI
-Text Label 1600 5100 2    50   ~ 0
+Text Label 2450 4850 0    50   ~ 0
 MISO
 Wire Wire Line
 	8950 2650 8950 2500
 Wire Wire Line
 	8050 2650 8050 2500
 Wire Wire Line
-	8050 2200 8500 2200
-Wire Wire Line
 	8950 2950 8950 3050
-Wire Wire Line
-	8950 3050 8500 3050
 Text Label 9600 2750 0    50   ~ 0
 SWCLK
 Text Label 9600 2850 0    50   ~ 0
 SWDIO
-$Comp
-L power:PWR_FLAG #FLG0101
-U 1 1 612115B1
-P 8500 2200
-F 0 "#FLG0101" H 8500 2275 50  0001 C CNN
-F 1 "PWR_FLAG" H 8500 2373 50  0000 C CNN
-F 2 "" H 8500 2200 50  0001 C CNN
-F 3 "~" H 8500 2200 50  0001 C CNN
-	1    8500 2200
-	1    0    0    -1  
-$EndComp
-Connection ~ 8500 2200
-Wire Wire Line
-	8500 2200 8950 2200
-$Comp
-L power:GND #PWR0101
-U 1 1 612121B0
-P 8500 3050
-F 0 "#PWR0101" H 8500 2800 50  0001 C CNN
-F 1 "GND" H 8505 2877 50  0000 C CNN
-F 2 "" H 8500 3050 50  0001 C CNN
-F 3 "" H 8500 3050 50  0001 C CNN
-	1    8500 3050
-	1    0    0    -1  
-$EndComp
-Connection ~ 8500 3050
-Wire Wire Line
-	8500 3050 8050 3050
-Text Label 9600 2200 0    50   ~ 0
-V3_3
-Text Label 9600 3050 0    50   ~ 0
-V0
 $Comp
 L Switch:SW_Push SW7
 U 1 1 60BCB460
@@ -432,66 +394,40 @@ Wire Wire Line
 	9700 4350 9700 4250
 Text Label 10150 3700 0    50   ~ 0
 NRST
-Text Label 10150 4350 0    50   ~ 0
-V0
 Wire Wire Line
 	10150 3700 10000 3700
 Connection ~ 10000 3700
 Wire Wire Line
 	10150 4350 10000 4350
 Connection ~ 10000 4350
-Text Label 5650 6800 0    50   ~ 0
+Text Label 6400 6800 0    50   ~ 0
 IR_IN
-Text Label 5650 6450 0    50   ~ 0
-V3_3
-Text Label 5650 6950 0    50   ~ 0
-V0
-Text Label 2850 4550 0    50   ~ 0
-V3_3
-Text Label 2850 5300 0    50   ~ 0
-V0
-Wire Wire Line
-	1900 5300 2850 5300
-Wire Wire Line
-	1800 4550 2650 4550
-Wire Wire Line
-	2650 4600 2650 4550
-Connection ~ 2650 4550
-Wire Wire Line
-	2650 4550 2850 4550
-Wire Wire Line
-	2850 4900 2650 4900
-Connection ~ 2650 4900
-Wire Wire Line
-	2850 5000 2200 5000
-Wire Wire Line
-	2200 5100 2850 5100
 Wire Wire Line
 	2850 5700 2500 5700
 Wire Wire Line
-	4550 6950 5000 6950
+	5300 6950 5750 6950
 Wire Wire Line
-	5000 6750 5000 6950
-Connection ~ 5000 6950
+	5750 6750 5750 6950
+Connection ~ 5750 6950
 Wire Wire Line
-	5000 6950 5650 6950
+	5750 6950 6400 6950
 Wire Wire Line
-	4550 6550 4700 6550
+	5300 6550 5450 6550
 Wire Wire Line
-	4700 6550 4700 6450
+	5450 6550 5450 6450
 Wire Wire Line
-	4700 6450 5000 6450
-Connection ~ 5000 6450
+	5450 6450 5750 6450
+Connection ~ 5750 6450
 Wire Wire Line
-	5000 6450 5250 6450
+	5750 6450 6000 6450
 Wire Wire Line
-	5550 6450 5650 6450
+	6300 6450 6400 6450
 Wire Wire Line
-	5650 6800 4700 6800
+	6400 6800 5450 6800
 Wire Wire Line
-	4700 6800 4700 6750
+	5450 6800 5450 6750
 Wire Wire Line
-	4700 6750 4550 6750
+	5450 6750 5300 6750
 Text Label 6700 2000 0    50   ~ 0
 KOK
 Text Label 6700 1800 0    50   ~ 0
@@ -680,14 +616,6 @@ Text Label 10500 1200 0    50   ~ 0
 VDD4
 Wire Wire Line
 	9400 1200 9950 1200
-Text Label 8300 900  0    50   ~ 0
-V3_3
-Text Label 8300 1800 2    50   ~ 0
-V0
-Text Label 10400 2500 0    50   ~ 0
-V0
-Text Label 10400 1950 0    50   ~ 0
-V3_3
 Wire Wire Line
 	8300 1200 8300 1050
 Wire Wire Line
@@ -808,8 +736,6 @@ Wire Wire Line
 	5900 1250 5900 1500
 Text Label 6000 1250 1    50   ~ 0
 VDDA
-Text Label 5500 1250 1    50   ~ 0
-V3_3
 Wire Wire Line
 	5500 1250 5500 1500
 Wire Wire Line
@@ -834,7 +760,7 @@ Wire Wire Line
 	5600 5100 5600 5350
 Wire Wire Line
 	5500 5350 5500 5100
-Text Notes 8000 750  0    50   ~ 10
+Text Notes 7900 650  0    50   ~ 10
 Power and decoupling
 Text Notes 850  850  0    50   ~ 10
 Diodes
@@ -842,7 +768,7 @@ Text Notes 8100 3500 0    50   ~ 10
 Switches
 Text Notes 1150 6200 0    50   ~ 10
 Crystal
-Text Notes 3300 6200 0    50   ~ 10
+Text Notes 4050 6200 0    50   ~ 10
 Ir sensing
 Text Notes 750  7700 0    50   ~ 0
 C_stray, the capacitance of the pcb trace and mcu is assumed to be 5 pF.\nC_l is the expected load capacitance of the\ncrystal. C is the capacitance from the capacitor at each leg.\nUse the following formula to determine C:\nC = 2*C_l - 2*C_stray = 2*18 - 10 [pF] =26 pF.
@@ -863,15 +789,9 @@ F 3 "~" H 9350 2200 50  0001 C CNN
 	0    1    1    0   
 $EndComp
 Wire Wire Line
-	9500 2200 9600 2200
-Wire Wire Line
 	8950 2750 9600 2750
 Wire Wire Line
 	8950 2850 9600 2850
-Wire Wire Line
-	8950 3050 9600 3050
-Text Label 1000 2100 0    50   ~ 0
-V0
 $Comp
 L Device:C C5
 U 1 1 613C85A7
@@ -888,10 +808,6 @@ Wire Wire Line
 Connection ~ 1000 1900
 Wire Wire Line
 	3300 2250 3300 2350
-Text Label 3300 2250 0    50   ~ 0
-V3_3
-Text Label 3300 3700 0    50   ~ 0
-V0
 $Comp
 L Device:R R4
 U 1 1 6114BC55
@@ -994,10 +910,6 @@ F 3 "~" H 10250 5550 50  0001 C CNN
 	1    10250 5550
 	1    0    0    -1  
 $EndComp
-Text Label 10750 5800 0    50   ~ 0
-V0
-Text Label 10750 4800 0    50   ~ 0
-V3_3
 Wire Wire Line
 	10150 5400 10250 5400
 Wire Wire Line
@@ -1039,8 +951,6 @@ NoConn ~ 6400 2600
 NoConn ~ 6400 2700
 NoConn ~ 6400 2800
 NoConn ~ 6400 2900
-NoConn ~ 6400 3000
-NoConn ~ 6400 3100
 NoConn ~ 6400 3200
 NoConn ~ 6400 3400
 NoConn ~ 6400 3500
@@ -1062,4 +972,114 @@ NoConn ~ 5000 4400
 NoConn ~ 5000 4500
 NoConn ~ 5000 4600
 NoConn ~ 5000 3200
+$Comp
+L power:VDD #PWR0101
+U 1 1 61487E14
+P 9600 2200
+F 0 "#PWR0101" H 9600 2050 50  0001 C CNN
+F 1 "VDD" H 9615 2373 50  0000 C CNN
+F 2 "" H 9600 2200 50  0001 C CNN
+F 3 "" H 9600 2200 50  0001 C CNN
+	1    9600 2200
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	8050 2200 8950 2200
+Wire Wire Line
+	8050 3050 8950 3050
+Wire Wire Line
+	9500 2200 9600 2200
+Wire Wire Line
+	1100 4450 1250 4450
+Wire Wire Line
+	1250 4450 1500 4450
+Wire Wire Line
+	1950 4450 1950 4650
+Connection ~ 1250 4450
+Wire Wire Line
+	1100 4850 1650 4850
+Wire Wire Line
+	1100 4950 1650 4950
+Wire Wire Line
+	1100 5050 1250 5050
+Wire Wire Line
+	1250 4750 1250 5050
+Connection ~ 1250 5050
+Wire Wire Line
+	1250 5050 1650 5050
+Wire Wire Line
+	1100 5450 2050 5450
+Wire Wire Line
+	2050 5450 2050 5400
+Wire Wire Line
+	2250 4850 2450 4850
+Wire Wire Line
+	1650 5150 1600 5150
+Wire Wire Line
+	1600 5150 1600 4450
+Connection ~ 1600 4450
+Wire Wire Line
+	1600 4450 1950 4450
+Wire Wire Line
+	1650 5250 1500 5250
+Wire Wire Line
+	1500 5250 1500 4450
+Connection ~ 1500 4450
+Wire Wire Line
+	1500 4450 1600 4450
+Text Notes 2250 4600 0    50   ~ 0
+Pull-up resistor for CS.\nR > (Vdd - Vol)/I = 2.9/0.008\n= 362.5 ohm\nI is the max current the mcu can sink
+Text Label 6700 3000 0    50   ~ 0
+SWDIO
+Text Label 6700 3100 0    50   ~ 0
+SWCLK
+Wire Wire Line
+	6700 3100 6400 3100
+Wire Wire Line
+	6400 3000 6700 3000
+Text Notes 9750 3050 0    50   ~ 0
+Using internal pull-up/down\nresistors for SWCLK and SWDIO\n
+Wire Wire Line
+	8950 3050 9600 3050
+$Comp
+L power:GND #PWR0102
+U 1 1 615C8EF3
+P 9600 3050
+F 0 "#PWR0102" H 9600 2800 50  0001 C CNN
+F 1 "GND" H 9605 2877 50  0000 C CNN
+F 2 "" H 9600 3050 50  0001 C CNN
+F 3 "" H 9600 3050 50  0001 C CNN
+	1    9600 3050
+	1    0    0    -1  
+$EndComp
+Text GLabel 8300 900  1    50   Input ~ 0
+VDD
+Text GLabel 8300 1800 3    50   Input ~ 0
+GND
+Text GLabel 10400 1950 1    50   Input ~ 0
+VDD
+Text GLabel 10400 2500 3    50   Input ~ 0
+GND
+Text GLabel 10150 4350 2    50   Input ~ 0
+GND
+Text GLabel 10750 4800 2    50   Input ~ 0
+VDD
+Text GLabel 6400 6950 2    50   Input ~ 0
+GND
+Text GLabel 10750 5800 2    50   Input ~ 0
+GND
+Text GLabel 6400 6450 2    50   Input ~ 0
+VDD
+Text GLabel 1100 4450 0    50   Input ~ 0
+VDD
+Text GLabel 1100 5450 0    50   Input ~ 0
+GND
+Text GLabel 3300 2250 1    50   Input ~ 0
+VDD
+Text GLabel 3300 3700 3    50   Input ~ 0
+GND
+Text GLabel 1000 2100 3    50   Input ~ 0
+GND
+Text GLabel 5500 1250 0    50   Input ~ 0
+VDD
 $EndSCHEMATC
