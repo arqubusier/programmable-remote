@@ -356,8 +356,6 @@ Wire Wire Line
 	7950 5600 8150 5600
 Wire Wire Line
 	7950 6000 8150 6000
-Text Label 8850 4000 0    50   ~ 0
-V3_3
 $Comp
 L Device:C C8
 U 1 1 61242CB5
@@ -1076,5 +1074,15 @@ VDD
 Text GLabel 9400 1050 1    50   Input ~ 0
 VDD
 Text GLabel 10400 1050 1    50   Input ~ 0
+VDD
+Text Label 3300 3100 0    50   ~ 0
+IR_Pwr1
+Text Label 3300 2700 0    50   ~ 0
+IR_Pwr2
+Text Label 8050 2600 0    50   ~ 0
+BAT+
+Text Label 8950 2550 0    50   ~ 0
+SWD_VDD
+Text GLabel 8850 4000 2    50   Input ~ 0
 VDD
 $EndSCHEMATC
