@@ -16,12 +16,12 @@ $EndDescr
 $Comp
 L Connector:Conn_01x01_Male J2
 U 1 1 60BCCB41
-P 2300 5700
-F 0 "J2" H 2408 5881 50  0000 C CNN
-F 1 "Conn_01x01_Male" H 2450 5600 50  0000 C CNN
-F 2 "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical" H 2300 5700 50  0001 C CNN
-F 3 "~" H 2300 5700 50  0001 C CNN
-	1    2300 5700
+P 2430 5680
+F 0 "J2" H 2538 5861 50  0000 C CNN
+F 1 "Conn_01x01_Male" H 2580 5580 50  0000 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical" H 2430 5680 50  0001 C CNN
+F 3 "~" H 2430 5680 50  0001 C CNN
+	1    2430 5680
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -114,14 +114,14 @@ Text Label 2250 1500 0    50   ~ 0
 STATUS
 Text Label 2250 1900 0    50   ~ 0
 FAIL
-Text Label 2850 5700 0    50   ~ 0
+Text Label 2980 5680 0    50   ~ 0
 USART_TX
 $Comp
 L Device:C C10
 U 1 1 60BE8135
 P 5750 6600
-F 0 "C10" H 5900 6600 50  0000 L CNN
-F 1 ".1u" H 5900 6500 50  0000 L CNN
+F 0 "C10" H 5570 6690 50  0000 L CNN
+F 1 ".1u" H 5610 6500 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0603_1608Metric_Pad1.08x0.95mm_HandSolder" H 5788 6450 50  0001 C CNN
 F 3 "~" H 5750 6600 50  0001 C CNN
 	1    5750 6600
@@ -141,12 +141,12 @@ $EndComp
 $Comp
 L programmable-remote:M95640_RMN6TP U2
 U 1 1 610CB268
-P 1950 5100
-F 0 "U2" H 2100 5550 50  0000 C CNN
-F 1 "M95640_RMN6TP" H 2500 5000 50  0000 C CNN
-F 2 "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" H 1950 5100 50  0001 C CNN
-F 3 "" H 1950 5100 50  0001 C CNN
-	1    1950 5100
+P 2080 5080
+F 0 "U2" H 2230 5530 50  0000 C CNN
+F 1 "M95640_RMN6TP" H 2630 4980 50  0000 C CNN
+F 2 "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" H 2080 5080 50  0001 C CNN
+F 3 "" H 2080 5080 50  0001 C CNN
+	1    2080 5080
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -158,17 +158,6 @@ F 1 "Battery" H 8158 2805 50  0000 L CNN
 F 2 "programmable-remote:Battery" V 8050 2910 50  0001 C CNN
 F 3 "~" V 8050 2910 50  0001 C CNN
 	1    8050 2850
-	1    0    0    -1  
-$EndComp
-$Comp
-L Device:R R5
-U 1 1 610D8C9C
-P 1250 4600
-F 0 "R5" H 1320 4646 50  0000 L CNN
-F 1 "4.7k" H 1320 4555 50  0000 L CNN
-F 2 "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder" V 1180 4600 50  0001 C CNN
-F 3 "~" H 1250 4600 50  0001 C CNN
-	1    1250 4600
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -248,13 +237,11 @@ F 3 "~" H 8950 2350 50  0001 C CNN
 	1    8950 2350
 	0    -1   1    0   
 $EndComp
-Text Label 1100 5050 2    50   ~ 0
-CS
-Text Label 1100 4950 2    50   ~ 0
+Text Label 1230 4930 2    50   ~ 0
 SCK
-Text Label 1100 4850 2    50   ~ 0
+Text Label 1230 4830 2    50   ~ 0
 MOSI
-Text Label 2450 4850 0    50   ~ 0
+Text Label 2580 4830 0    50   ~ 0
 MISO
 Wire Wire Line
 	8950 2650 8950 2500
@@ -390,7 +377,7 @@ Connection ~ 10000 4350
 Text Label 6400 6800 0    50   ~ 0
 IR_IN
 Wire Wire Line
-	2850 5700 2500 5700
+	2980 5680 2630 5680
 Wire Wire Line
 	5750 6750 5750 6900
 Connection ~ 5750 6900
@@ -407,8 +394,6 @@ Wire Wire Line
 	5750 6450 6000 6450
 Wire Wire Line
 	6300 6450 6400 6450
-Wire Wire Line
-	6400 6800 5450 6800
 Text Label 6700 2000 0    50   ~ 0
 KOK
 Text Label 6700 1800 0    50   ~ 0
@@ -798,7 +783,7 @@ F 3 "~" H 3300 2500 50  0001 C CNN
 $EndComp
 Text Label 2050 3350 2    50   ~ 0
 IR_OUT
-Text Notes 1000 4300 0    50   ~ 10
+Text Notes 1130 4280 0    50   ~ 10
 Serial devices
 $Comp
 L Device:R R3
@@ -812,7 +797,7 @@ F 3 "~" H 3300 2900 50  0001 C CNN
 	-1   0    0    1   
 $EndComp
 Wire Wire Line
-	3300 2650 3300 2750
+	3300 2650 3300 2700
 Wire Wire Line
 	3300 3050 3300 3150
 Wire Wire Line
@@ -820,8 +805,8 @@ Wire Wire Line
 Wire Wire Line
 	2050 3350 2350 3350
 Wire Wire Line
-	2650 3350 3000 3350
-Text Notes 800  2950 0    50   ~ 0
+	2650 3350 2750 3350
+Text Notes 650  3100 0    50   ~ 0
 Assume saturation for the following:\nI_ledmax = 100 mA\nR_collector = (V3_3 - V_led - V_transistor)/l_ledmax\nR_collector = (3.3 - 1.42 - 1)/0.1 ohm = 8.8 ohm\nI_base = I_ledmax/Hfe*ODF = .1/50000*10 A = 20 uA\nR_base = (V3_3 - V_be) / I_base\n= (3.3 - 2) / 0.00002 ohm = 65 kohm\n
 $Comp
 L Device:Q_NPN_Darlington_BCE Q1
@@ -956,44 +941,28 @@ Wire Wire Line
 Wire Wire Line
 	9500 2200 9600 2200
 Wire Wire Line
-	1100 4450 1250 4450
+	2080 4430 2080 4630
 Wire Wire Line
-	1250 4450 1500 4450
+	1230 5430 2180 5430
 Wire Wire Line
-	1950 4450 1950 4650
-Connection ~ 1250 4450
+	2180 5430 2180 5380
 Wire Wire Line
-	1100 4850 1650 4850
+	2380 4830 2430 4830
 Wire Wire Line
-	1100 4950 1650 4950
+	1780 5130 1730 5130
 Wire Wire Line
-	1100 5050 1250 5050
+	1730 5130 1730 4430
+Connection ~ 1730 4430
 Wire Wire Line
-	1250 4750 1250 5050
-Connection ~ 1250 5050
+	1730 4430 2080 4430
 Wire Wire Line
-	1250 5050 1650 5050
+	1780 5230 1630 5230
 Wire Wire Line
-	1100 5450 2050 5450
+	1630 5230 1630 4430
+Connection ~ 1630 4430
 Wire Wire Line
-	2050 5450 2050 5400
-Wire Wire Line
-	2250 4850 2450 4850
-Wire Wire Line
-	1650 5150 1600 5150
-Wire Wire Line
-	1600 5150 1600 4450
-Connection ~ 1600 4450
-Wire Wire Line
-	1600 4450 1950 4450
-Wire Wire Line
-	1650 5250 1500 5250
-Wire Wire Line
-	1500 5250 1500 4450
-Connection ~ 1500 4450
-Wire Wire Line
-	1500 4450 1600 4450
-Text Notes 2250 4600 0    50   ~ 0
+	1630 4430 1730 4430
+Text Notes 2380 4580 0    50   ~ 0
 Pull-up resistor for CS.\nR > (Vdd - Vol)/I = 2.9/0.008\n= 362.5 ohm\nI is the max current the mcu can sink
 Text Label 6700 3000 0    50   ~ 0
 SWDIO
@@ -1036,9 +1005,9 @@ Text GLabel 10750 5800 2    50   Input ~ 0
 GND
 Text GLabel 6400 6450 2    50   Input ~ 0
 VDD
-Text GLabel 1100 4450 0    50   Input ~ 0
+Text GLabel 1230 4430 0    50   Input ~ 0
 VDD
-Text GLabel 1100 5450 0    50   Input ~ 0
+Text GLabel 1230 5430 0    50   Input ~ 0
 GND
 Text GLabel 3300 2250 1    50   Input ~ 0
 VDD
@@ -1085,4 +1054,136 @@ Text Label 8950 2550 0    50   ~ 0
 SWD_VDD
 Text GLabel 8850 4000 2    50   Input ~ 0
 VDD
+$Comp
+L Connector:TestPoint TP4
+U 1 1 611DB70E
+P 2430 4830
+F 0 "TP4" H 2488 4948 50  0000 L CNN
+F 1 "TestPoint" H 2480 5030 50  0000 L CNN
+F 2 "programmable-remote:TestPoint_harwin_S2761-46R" H 2630 4830 50  0001 C CNN
+F 3 "~" H 2630 4830 50  0001 C CNN
+	1    2430 4830
+	1    0    0    -1  
+$EndComp
+Connection ~ 2430 4830
+Wire Wire Line
+	2430 4830 2580 4830
+Text Label 1230 5030 2    50   ~ 0
+CS
+Wire Wire Line
+	1380 5030 1780 5030
+Connection ~ 1380 5030
+Wire Wire Line
+	1380 4730 1380 5030
+Connection ~ 1380 4430
+Wire Wire Line
+	1380 4430 1630 4430
+Wire Wire Line
+	1230 4430 1380 4430
+$Comp
+L Device:R R5
+U 1 1 610D8C9C
+P 1380 4580
+F 0 "R5" H 1450 4626 50  0000 L CNN
+F 1 "4.7k" H 1450 4535 50  0000 L CNN
+F 2 "Resistor_SMD:R_0603_1608Metric_Pad0.98x0.95mm_HandSolder" V 1310 4580 50  0001 C CNN
+F 3 "~" H 1380 4580 50  0001 C CNN
+	1    1380 4580
+	1    0    0    -1  
+$EndComp
+$Comp
+L Connector:TestPoint TP3
+U 1 1 6120B96A
+P 1100 4830
+F 0 "TP3" V 1220 5150 50  0000 C CNN
+F 1 "TestPoint" V 1150 5180 50  0000 C CNN
+F 2 "programmable-remote:TestPoint_harwin_S2761-46R" H 1300 4830 50  0001 C CNN
+F 3 "~" H 1300 4830 50  0001 C CNN
+	1    1100 4830
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Connector:TestPoint TP5
+U 1 1 6120C2C0
+P 1100 4930
+F 0 "TP5" V 1140 5250 50  0000 C CNN
+F 1 "TestPoint" V 1070 5270 50  0000 C CNN
+F 2 "programmable-remote:TestPoint_harwin_S2761-46R" H 1300 4930 50  0001 C CNN
+F 3 "~" H 1300 4930 50  0001 C CNN
+	1    1100 4930
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Connector:TestPoint TP6
+U 1 1 6120CA73
+P 1100 5030
+F 0 "TP6" V 1030 5260 50  0000 C CNN
+F 1 "TestPoint" V 950 5260 50  0000 C CNN
+F 2 "programmable-remote:TestPoint_harwin_S2761-46R" H 1300 5030 50  0001 C CNN
+F 3 "~" H 1300 5030 50  0001 C CNN
+	1    1100 5030
+	0    -1   -1   0   
+$EndComp
+Wire Wire Line
+	1100 4830 1780 4830
+Wire Wire Line
+	1100 4930 1780 4930
+Wire Wire Line
+	1100 5030 1380 5030
+$Comp
+L Connector:TestPoint TP2
+U 1 1 6123CA6F
+P 2750 3350
+F 0 "TP2" H 2808 3468 50  0000 L CNN
+F 1 "TestPoint" H 2808 3377 50  0000 L CNN
+F 2 "programmable-remote:TestPoint_harwin_S2761-46R" H 2950 3350 50  0001 C CNN
+F 3 "~" H 2950 3350 50  0001 C CNN
+	1    2750 3350
+	1    0    0    -1  
+$EndComp
+Connection ~ 2750 3350
+Wire Wire Line
+	2750 3350 3000 3350
+$Comp
+L Connector:TestPoint TP1
+U 1 1 6123D980
+P 3300 2700
+F 0 "TP1" V 3254 2888 50  0000 L CNN
+F 1 "TestPoint" V 3345 2888 50  0000 L CNN
+F 2 "programmable-remote:TestPoint_harwin_S2761-46R" H 3500 2700 50  0001 C CNN
+F 3 "~" H 3500 2700 50  0001 C CNN
+	1    3300 2700
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Connector:TestPoint TP7
+U 1 1 6124931E
+P 5990 6800
+F 0 "TP7" H 6040 6940 50  0000 L CNN
+F 1 "TestPoint" H 6020 6860 50  0000 L CNN
+F 2 "programmable-remote:TestPoint_harwin_S2761-46R" H 6190 6800 50  0001 C CNN
+F 3 "~" H 6190 6800 50  0001 C CNN
+	1    5990 6800
+	1    0    0    -1  
+$EndComp
+Connection ~ 5990 6800
+Wire Wire Line
+	5990 6800 5450 6800
+Wire Wire Line
+	5990 6800 6400 6800
+$Comp
+L Connector:TestPoint TP8
+U 1 1 61183496
+P 9600 2200
+F 0 "TP8" V 9500 2300 50  0000 L CNN
+F 1 "TestPoint" V 9700 2200 50  0000 L CNN
+F 2 "programmable-remote:TestPoint_harwin_S2761-46R" H 9800 2200 50  0001 C CNN
+F 3 "~" H 9800 2200 50  0001 C CNN
+	1    9600 2200
+	0    1    1    0   
+$EndComp
+Connection ~ 9600 2200
+Connection ~ 3300 2700
+Wire Wire Line
+	3300 2700 3300 2750
 $EndSCHEMATC
