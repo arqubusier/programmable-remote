@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xcsg version="1.0">
+	<metadata>
+		<software name="angelcad" version="V1.5-06"/>
+		<model name="remote" created="2021-08-21T19:12:57"/>
+	</metadata>
+	<difference3d>
+		<difference3d>
+			<difference3d>
+				<minkowski3d>
+					<cuboid dx="36" dy="46" dz="3" center="true">
+						<tmatrix>
+							<trow c0="1" c1="0" c2="0" c3="0"/>
+							<trow c0="0" c1="1" c2="0" c3="0"/>
+							<trow c0="0" c1="0" c2="1" c3="2.5"/>
+							<trow c0="0" c1="0" c2="0" c3="1"/>
+						</tmatrix>
+					</cuboid>
+					<cone h="2" r1="2" r2="0" center="true"/>
+				</minkowski3d>
+				<cuboid dx="36" dy="46" dz="3" center="true">
+					<tmatrix>
+						<trow c0="1" c1="0" c2="0" c3="0"/>
+						<trow c0="0" c1="1" c2="0" c3="0"/>
+						<trow c0="0" c1="0" c2="3" c3="4.5"/>
+						<trow c0="0" c1="0" c2="0" c3="1"/>
+					</tmatrix>
+				</cuboid>
+			</difference3d>
+			<union3d>
+				<union3d>
+					<union3d>
+						<union3d>
+							<union3d>
+								<union3d>
+									<union3d>
+										<union3d>
+											<union3d>
+												<union3d>
+													<union3d>
+														<cuboid dx="0.5" dy="1" dz="1" center="true">
+															<tmatrix>
+																<trow c0="1" c1="0" c2="0" c3="18.25"/>
+																<trow c0="0" c1="1" c2="0" c3="-15"/>
+																<trow c0="0" c1="0" c2="1" c3="1.5"/>
+																<trow c0="0" c1="0" c2="0" c3="1"/>
+															</tmatrix>
+														</cuboid>
+														<cuboid dx="0.5" dy="1" dz="1" center="true">
+															<tmatrix>
+																<trow c0="-1" c1="0" c2="0" c3="-18.25"/>
+																<trow c0="0" c1="1" c2="0" c3="-15"/>
+																<trow c0="0" c1="0" c2="1" c3="1.5"/>
+																<trow c0="0" c1="0" c2="0" c3="1"/>
+															</tmatrix>
+														</cuboid>
+													</union3d>
+													<cuboid dx="0.5" dy="1" dz="1" center="true">
+														<tmatrix>
+															<trow c0="1" c1="0" c2="0" c3="18.25"/>
+															<trow c0="0" c1="1" c2="0" c3="5"/>
+															<trow c0="0" c1="0" c2="1" c3="1.5"/>
+															<trow c0="0" c1="0" c2="0" c3="1"/>
+														</tmatrix>
+													</cuboid>
+												</union3d>
+												<cuboid dx="0.5" dy="1" dz="1" center="true">
+													<tmatrix>
+														<trow c0="-1" c1="0" c2="0" c3="-18.25"/>
+														<trow c0="0" c1="1" c2="0" c3="5"/>
+														<trow c0="0" c1="0" c2="1" c3="1.5"/>
+														<trow c0="0" c1="0" c2="0" c3="1"/>
+													</tmatrix>
+												</cuboid>
+											</union3d>
+											<cuboid dx="0.5" dy="1" dz="1" center="true">
+												<tmatrix>
+													<trow c0="1" c1="0" c2="0" c3="18.25"/>
+													<trow c0="0" c1="1" c2="0" c3="-5"/>
+													<trow c0="0" c1="0" c2="1" c3="1.5"/>
+													<trow c0="0" c1="0" c2="0" c3="1"/>
+												</tmatrix>
+											</cuboid>
+										</union3d>
+										<cuboid dx="0.5" dy="1" dz="1" center="true">
+											<tmatrix>
+												<trow c0="-1" c1="0" c2="0" c3="-18.25"/>
+												<trow c0="0" c1="1" c2="0" c3="-5"/>
+												<trow c0="0" c1="0" c2="1" c3="1.5"/>
+												<trow c0="0" c1="0" c2="0" c3="1"/>
+											</tmatrix>
+										</cuboid>
+									</union3d>
+									<cuboid dx="0.5" dy="1" dz="1" center="true">
+										<tmatrix>
+											<trow c0="1" c1="0" c2="0" c3="18.25"/>
+											<trow c0="0" c1="1" c2="0" c3="15"/>
+											<trow c0="0" c1="0" c2="1" c3="1.5"/>
+											<trow c0="0" c1="0" c2="0" c3="1"/>
+										</tmatrix>
+									</cuboid>
+								</union3d>
+								<cuboid dx="0.5" dy="1" dz="1" center="true">
+									<tmatrix>
+										<trow c0="-1" c1="0" c2="0" c3="-18.25"/>
+										<trow c0="0" c1="1" c2="0" c3="15"/>
+										<trow c0="0" c1="0" c2="1" c3="1.5"/>
+										<trow c0="0" c1="0" c2="0" c3="1"/>
+									</tmatrix>
+								</cuboid>
+							</union3d>
+							<cuboid dx="0.5" dy="1" dz="1" center="true">
+								<tmatrix>
+									<trow c0="6.123233995736766e-17" c1="-1" c2="0" c3="-5"/>
+									<trow c0="1" c1="6.123233995736766e-17" c2="0" c3="23.25"/>
+									<trow c0="0" c1="0" c2="1" c3="1.5"/>
+									<trow c0="0" c1="0" c2="0" c3="1"/>
+								</tmatrix>
+							</cuboid>
+						</union3d>
+						<cuboid dx="0.5" dy="1" dz="1" center="true">
+							<tmatrix>
+								<trow c0="6.123233995736766e-17" c1="-1" c2="0" c3="-5"/>
+								<trow c0="-1" c1="-6.123233995736766e-17" c2="0" c3="-23.25"/>
+								<trow c0="0" c1="0" c2="1" c3="1.5"/>
+								<trow c0="0" c1="0" c2="0" c3="1"/>
+							</tmatrix>
+						</cuboid>
+					</union3d>
+					<cuboid dx="0.5" dy="1" dz="1" center="true">
+						<tmatrix>
+							<trow c0="6.123233995736766e-17" c1="-1" c2="0" c3="5"/>
+							<trow c0="1" c1="6.123233995736766e-17" c2="0" c3="23.25"/>
+							<trow c0="0" c1="0" c2="1" c3="1.5"/>
+							<trow c0="0" c1="0" c2="0" c3="1"/>
+						</tmatrix>
+					</cuboid>
+				</union3d>
+				<cuboid dx="0.5" dy="1" dz="1" center="true">
+					<tmatrix>
+						<trow c0="6.123233995736766e-17" c1="-1" c2="0" c3="5"/>
+						<trow c0="-1" c1="-6.123233995736766e-17" c2="0" c3="-23.25"/>
+						<trow c0="0" c1="0" c2="1" c3="1.5"/>
+						<trow c0="0" c1="0" c2="0" c3="1"/>
+					</tmatrix>
+				</cuboid>
+			</union3d>
+		</difference3d>
+		<cuboid dx="38.200000000000003" dy="48.200000000000003" dz="0.60000000000000009" center="true">
+			<tmatrix>
+				<trow c0="1" c1="0" c2="0" c3="0"/>
+				<trow c0="0" c1="1" c2="0" c3="0"/>
+				<trow c0="0" c1="0" c2="1" c3="0.30000000000000004"/>
+				<trow c0="0" c1="0" c2="0" c3="1"/>
+			</tmatrix>
+		</cuboid>
+	</difference3d>
+</xcsg>
