@@ -91,19 +91,27 @@ module BatteryHolderNegative() {
         cube([2*battery_d, battery_y, battery_d]);
 }
 
-
-
-
-chamfer = 1.6;
+plate_thick = 2;
 wall_thick = 2.7;
-width_outer = switch_side_inner + switch_sep + 2*wall_thick;
+chamfer = 1.6;
+
+pcb_y = 72.3;
+pcb_x = switch_sep*2+ 2*2.7;
+pcb_z = .8;
+pcb_pos_z = 3.5 + plate_thick - pcb_z;
+pcb_pos_y = wall_thick + battery_holder_y + 1;
+
+switch_row0_pos_y = pcb_pos_y + 9 + switch_sep/2;
+
+
+width_outer = pcb_x + 2*wall_thick;
 width_inner = width_outer - 2*wall_thick;
 height_high_inner = battery_d + plate_thick;
 height_high_outer = height_high_inner + wall_thick;
-height_low_inner = 5;
+height_low_inner = pcb_pos_z + pcb_z + 5.1;
 height_low_outer = height_low_inner + wall_thick;
 
-box1_outer_y = battery_holder_y + 10 + 2*chamfer;
+box1_outer_y = switch_row0_poz_y + 2*chamfer;
 box1_inner_y = box1_outer_y - 2*wall_thick;
 
 box2_outer_y = 3*switch_sep + 4*chamfer;
@@ -117,6 +125,10 @@ box3_pos = box2_pos + [0, box2_outer_y - 2*chamfer, 0];
 
 outer_z = box2_pos_z + box2_outer_y + box3_outer_y - 2*chamfer;
 inner_z = outer_z - 2*wall_thick;
+
+plate_lip_z = .6;
+plate_lip_x = width_inner +2*.5;
+plate_lip_y = inner_z +2*.5;
 
 module BatteryHolder() {
     
@@ -191,10 +203,8 @@ module Hook() {
 }
 
 
-plate_thick = 2;
-plate_lip_z = .6;
-plate_lip_x = width_inner +2*.5;
-plate_lip_y = inner_z +2*.5;
+
+
 module Plate(clearance=0) {
     PlaceNiches()
         Hook();
@@ -206,29 +216,36 @@ module Plate(clearance=0) {
         cube([plate_lip_x+2*clearance, plate_lip_y+2*clearance, plate_lip_z+clearance]);
 }
 
-pcb_pos_z = chamfer + 1;
-pcb_z = 1;
+
+
+ir_tx_x = 3;
+ir_tx_rel_x = (3.15 + 0.64/2);
+ir_rx_x = 6.6;
+ir_rx_rel_x = -(1 + 5.6/2);
 module SensorHoles() {
-    #translate([width_outer/2, 2*chamfer + outer_z-1*wall_thick, pcb_z + pcb_pos_z]) {
-        translate([3, 0, 0])
+    #translate([width_outer/2, 2*chamfer + outer_z-1*wall_thick, pcb_pos_z + pcb_pos_z]) {
+        translate([ir_tx_rel_x, 0, 0])
             rotate([90, 0, 0])
                 BoxFilletSides(3, 2, 2*wall_thick, .5);
-        translate([-3, 0, 0])
+        translate([ir_rx_rel_x, 0, 0])
             rotate([90, 0, 0])
                 cylinder(h = 2*wall_thick, r=3);
     }
 }
 
 module SwitchHoles() {
-    translate (
-        box2_pos +
-        [wall_thick+switch_side_inner/2, chamfer+wall_thick+switch_sep/2, height_low_outer - switch_height])
-    for (col = [0:1]) {
-        for (row = [0:2]) {
-            translate([col*switch_sep, row*switch_sep, 0])
-                switch_neg(3);
+    translate ([width_outer/2-switch_sep/2, switch_row0_pos_y, height_low_outer - switch_height])
+        for (col = [0:1]) {
+            for (row = [0:2]) {
+                translate([col*switch_sep, row*switch_sep, 0])
+                    switch_neg(3);
+            }
         }
-    }
+}
+
+module Pcb() {
+    translate([wall_thick,pcb_pos_y,pcb_pos_z]) 
+        cube([pcb_x, pcb_y, pcb_z]);
 }
 
 
@@ -247,4 +264,5 @@ difference() {
     PlaceNiches()
         Niche();
 }
+Pcb();
 //Plate();
