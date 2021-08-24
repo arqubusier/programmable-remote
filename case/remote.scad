@@ -1,6 +1,6 @@
 include <cherrymx.scad>
 
-$fn = 10;
+$fn = 20;
 module TriangleRightAngle(w, h) {
     polygon([[0,0], [w,0], [w,h]]);
 }
@@ -37,12 +37,14 @@ module BoxFilletSides(x, y, z, chamfer) {
 }
 
 
-battery_y = 44;
+battery_y = 44+1.5;
 battery_d = 10;
+battery_z = battery_d + 1.1;
 battery_clip_x = 6.9 + .2;
 battery_clip_y = .5 + .2;
+battery_clip_plus_y = 2;
 battery_clip_wall_thick = .8;
-battery_clip_holder_y = battery_clip_y + 2*battery_clip_wall_thick;
+battery_clip_holder_y = battery_clip_plus_y + 2*battery_clip_wall_thick;
 battery_holder_y = battery_y + 2*battery_clip_holder_y;
 battery_holder_side_thick = 1;
 battery_holder_x = 2*battery_d + battery_holder_side_thick;
@@ -63,21 +65,28 @@ module BatteryClipHolderNegative() {
             cube([battery_clip_x, battery_clip_y, battery_d]);
     }
     
-    translate([-battery_clip_x/2, -battery_clip_wall_thick-battery_clip_y, battery_d/2-2.5+.1]) {
-        cube([battery_d + battery_clip_x, battery_clip_y, 2.5]);
+    translate([-battery_clip_x/2, -battery_clip_wall_thick-battery_clip_y, -battery_d/2]) {
+        cube([battery_d + battery_clip_x, battery_clip_y, battery_d]);
     }
     
-    translate([-battery_clip_y/2, -battery_clip_holder_y - battery_clip_wall_thick, -battery_clip_y + battery_d/2 +.1]) {
-        cube([battery_clip_y,battery_clip_holder_y,battery_clip_y]);
+    translate([-battery_clip_y/2, -battery_clip_holder_y - battery_clip_wall_thick, -battery_clip_y + battery_d/2-1]) {
+        cube([battery_clip_y,battery_clip_holder_y,battery_clip_y+1]);
         translate([battery_d, 0, 0])
-            cube([battery_clip_y,battery_clip_holder_y,battery_clip_y]);
+            cube([battery_clip_y,battery_clip_holder_y,battery_clip_y+1]);
+    }
+    
+    
+    translate([-(battery_clip_x - 1)/2,-battery_clip_wall_thick - .1,0]) {
+        cube([battery_clip_x - 1, battery_clip_wall_thick + .2, battery_d/2+1]);
+        translate([battery_d, 0, 0])
+            cube([battery_clip_x - 1, battery_clip_wall_thick + .2, battery_d/2+1]);
     }
 }
 
 module BatteryHolderNegative() {
     translate([battery_d/2, battery_clip_holder_y, battery_d/2]){
         rotate([-90, 0, 0])
-            cylinder(battery_y,d=battery_d);
+            #cylinder(battery_y,d=battery_d);
         translate([battery_d, 0, 0])
             rotate([-90, 0, 0])
                 cylinder(battery_y,d=battery_d);
@@ -98,7 +107,7 @@ chamfer = 1.6;
 pcb_y = 72.3;
 pcb_x = switch_sep*2+ 2*2.7;
 pcb_z = .8;
-pcb_pos_z = 3.5 + plate_thick - pcb_z;
+pcb_pos_z = 3.5 + plate_thick;
 pcb_pos_y = wall_thick + battery_holder_y + 1;
 
 switch_row0_pos_y = pcb_pos_y + 9 + switch_sep/2;
@@ -106,24 +115,24 @@ switch_row0_pos_y = pcb_pos_y + 9 + switch_sep/2;
 
 width_outer = pcb_x + 2*wall_thick;
 width_inner = width_outer - 2*wall_thick;
-height_high_inner = battery_d + plate_thick;
+height_high_inner = battery_z + plate_thick;
 height_high_outer = height_high_inner + wall_thick;
-height_low_inner = pcb_pos_z + pcb_z + 5.1;
-height_low_outer = height_low_inner + wall_thick;
+height_low_outer = pcb_pos_z + pcb_z + 5.1;
+height_low_inner = height_low_outer - wall_thick;
 
-box1_outer_y = switch_row0_poz_y + 2*chamfer;
+box1_outer_y = switch_row0_pos_y - switch_sep/2;
 box1_inner_y = box1_outer_y - 2*wall_thick;
 
 box2_outer_y = 3*switch_sep + 4*chamfer;
 box2_inner_y = box2_outer_y - 2*wall_thick;
-box2_pos_z = box1_outer_y - 2*chamfer;
-box2_pos = [0, box2_pos_z, 0];
+box2_pos_y = box1_outer_y - 2*chamfer;
+box2_pos = [0, box2_pos_y, 0];
 
-box3_inner_y = 10;
+box3_inner_y = 3.8;
 box3_outer_y = box3_inner_y + 2*wall_thick;
 box3_pos = box2_pos + [0, box2_outer_y - 2*chamfer, 0];
 
-outer_z = box2_pos_z + box2_outer_y + box3_outer_y - 2*chamfer;
+outer_z = box2_pos_y+ box2_outer_y + box3_outer_y - 2*chamfer;
 inner_z = outer_z - 2*wall_thick;
 
 plate_lip_z = .6;
@@ -157,7 +166,11 @@ module ShellNegative() {
         translate(box3_pos)
             BoxChamferTop(width_inner, box3_inner_y, height_high_inner, chamfer);
     }
-
+    
+    #translate([wall_thick, switch_row0_pos_y - switch_side_inner/2-7+.1, pcb_pos_z])
+        cube([width_inner, 7, 3.8]);
+    #translate([wall_thick, switch_row0_pos_y +2*switch_sep+ switch_side_inner/2-.1, pcb_pos_z])
+        cube([width_inner, 7, 3.8]);
 }
 
 niche_pos_z = 1.6;
@@ -218,19 +231,21 @@ module Plate(clearance=0) {
 
 
 
-ir_tx_x = 3;
-ir_tx_rel_x = (3.15 + 0.64/2);
+ir_tx_x = 3.4;
+ir_tx_rel_x = -3.8-ir_tx_x;
 ir_rx_x = 6.6;
-ir_rx_rel_x = -(1 + 5.6/2);
+ir_rx_rel_x = 3.5;
 module SensorHoles() {
-    #translate([width_outer/2, 2*chamfer + outer_z-1*wall_thick, pcb_pos_z + pcb_pos_z]) {
-        translate([ir_tx_rel_x, 0, 0])
+    #translate([width_outer/2, 2*chamfer + outer_z-1*wall_thick, pcb_pos_z + pcb_z]) {
+        translate([ir_tx_rel_x, -.1, 0])
             rotate([90, 0, 0])
-                BoxFilletSides(3, 2, 2*wall_thick, .5);
-        translate([ir_rx_rel_x, 0, 0])
+                BoxFilletSides(ir_rx_x, 2, 4, .5);
+        translate([ir_rx_rel_x, 0, ir_tx_x/2])
             rotate([90, 0, 0])
-                cylinder(h = 2*wall_thick, r=3);
+                cylinder(h = 10, d=ir_tx_x);
     }
+    
+    BoxFilletSides(2,2,wall_thick,.5);
 }
 
 module SwitchHoles() {
@@ -248,21 +263,24 @@ module Pcb() {
         cube([pcb_x, pcb_y, pcb_z]);
 }
 
-
-difference() {
-    union() {
-        difference() {
-            ShellPositive();
-            ShellNegative();
+module Shell() {
+    difference() {
+        union() {
+            difference() {
+                ShellPositive();
+                ShellNegative();
+            }
+            BatteryHolder();
         }
-        BatteryHolder();
-    }
 
-    SensorHoles();
-    SwitchHoles();
-    Plate(.2);
-    PlaceNiches()
-        Niche();
+        SensorHoles();
+        SwitchHoles();
+        Plate(.2);
+        PlaceNiches()
+            Niche();
+    }
 }
-Pcb();
+
+Shell();
+//Pcb();
 //Plate();
