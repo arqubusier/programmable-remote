@@ -55,6 +55,12 @@ DOES NOT WORK
   stm32f1x mass_erase 0
   flash write_bank 0 src/programmable-remote.bin 0
   reset halt
+  
+## Write protection error
+
+Solve using 
+
+  reset halt; stm32f1x unlock 0
 
 ## Debug with openocd and gdb
 

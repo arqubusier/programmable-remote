@@ -1,3 +1,15 @@
+* Todo
+** TODO Ir sensor wrong orientation
+** TODO Ir sensor footprint mark direction
+** TODO SWD Silkscreen pin marking
+** TODO No dip switch use solder bridge instead
+** TODO lower profile crystal
+** TODO Reset switch wrong pinout
+** TODO Battery holder pads match battery holder placement better
+** TODO Battery holder battery too tight
+** TODO Transistor swap pins
+** TODO Bad ir range
+** TODO pcb remote not working with AV reciever
 * Design
 ** General algorihm
 Assume protocol has a series of bursts.

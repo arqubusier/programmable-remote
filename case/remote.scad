@@ -37,7 +37,7 @@ module BoxFilletSides(x, y, z, chamfer) {
 }
 
 
-battery_y = 44+1.5;
+battery_y = 44+.5;
 battery_d = 10;
 battery_z = battery_d + 1.1;
 battery_clip_x = 6.9 + .2;
@@ -167,10 +167,10 @@ module ShellNegative() {
             BoxChamferTop(width_inner, box3_inner_y, height_high_inner, chamfer);
     }
     
-    #translate([wall_thick, switch_row0_pos_y - switch_side_inner/2-7+.1, pcb_pos_z])
-        cube([width_inner, 7, 3.8]);
-    #translate([wall_thick, switch_row0_pos_y +2*switch_sep+ switch_side_inner/2-.1, pcb_pos_z])
-        cube([width_inner, 7, 3.8]);
+    translate([wall_thick, switch_row0_pos_y - switch_side_inner/2-7-1.2, pcb_pos_z + pcb_z])
+        cube([width_inner, 7, 4]);
+    translate([wall_thick, switch_row0_pos_y +2*switch_sep+ switch_side_inner/2+1.2, pcb_pos_z + pcb_z])
+        cube([width_inner, 7, 4]);
 }
 
 niche_pos_z = 1.6;
@@ -236,16 +236,23 @@ ir_tx_rel_x = -3.8-ir_tx_x;
 ir_rx_x = 6.6;
 ir_rx_rel_x = 3.5;
 module SensorHoles() {
-    #translate([width_outer/2, 2*chamfer + outer_z-1*wall_thick, pcb_pos_z + pcb_z]) {
+    translate([width_outer/2, 2*chamfer + outer_z-1*wall_thick, pcb_pos_z + pcb_z]) {
         translate([ir_tx_rel_x, -.1, 0])
             rotate([90, 0, 0])
                 BoxFilletSides(ir_rx_x, 2, 4, .5);
         translate([ir_rx_rel_x, 0, ir_tx_x/2])
             rotate([90, 0, 0])
                 cylinder(h = 10, d=ir_tx_x);
+        
     }
-    
-    BoxFilletSides(2,2,wall_thick,.5);
+    led_hole_z = 20;
+    led_hole_x = 2;
+    #translate([width_outer/2+-led_hole_x/2, pcb_pos_y+pcb_y-3.4, height_high_outer - led_hole_z -.1]) {
+        translate([-8.2,0,0])
+            BoxFilletSides(led_hole_x,led_hole_x,led_hole_z,.5);
+        translate([-10.8,0,0])
+            BoxFilletSides(led_hole_x,led_hole_x,led_hole_z,.5);
+    }  
 }
 
 module SwitchHoles() {
@@ -281,6 +288,6 @@ module Shell() {
     }
 }
 
-Shell();
+//Shell();
 //Pcb();
-//Plate();
+Plate();
